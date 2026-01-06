@@ -6,6 +6,7 @@ import { useStore } from '@/store/useStore';
 import { Settings } from '@/types';
 import { formatCurrency } from '@/lib/calculations';
 import { useToast } from '@/hooks/use-toast';
+import { SecuritySettings } from '@/components/Security/SecuritySettings';
 
 interface SettingItemProps {
   label: string;
@@ -73,6 +74,9 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-5 animate-slide-up pb-6">
+      {/* Security Settings */}
+      <SecuritySettings />
+      
       {/* Route Rates */}
       <div className="bg-card rounded-2xl p-4 shadow-card">
         <h3 className="text-sm font-semibold text-primary mb-2">노선 단가</h3>

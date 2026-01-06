@@ -9,6 +9,7 @@ import {
 import { WorkInputForm } from '@/components/Input/WorkInputForm';
 import { RecordsList } from '@/components/Records/RecordsList';
 import { SettingsPage } from '@/components/Settings/SettingsPage';
+import { AuthGate } from '@/components/Security/AuthGate';
 import { WorkRecord } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,31 +34,33 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <AuthGate>
+      <div className="min-h-screen bg-background">
+        <Header />
 
-      <main className="max-w-lg mx-auto px-4 py-5 pb-24">
-        {activeTab === 'dashboard' && (
-          <div className="space-y-5">
-            <IncomeCard />
-            <CollectionRateGauge />
-            <TodayStats />
-          </div>
-        )}
+        <main className="max-w-lg mx-auto px-4 py-5 pb-24">
+          {activeTab === 'dashboard' && (
+            <div className="space-y-5">
+              <IncomeCard />
+              <CollectionRateGauge />
+              <TodayStats />
+            </div>
+          )}
 
-        {activeTab === 'input' && (
-          <WorkInputForm onComplete={handleInputComplete} />
-        )}
+          {activeTab === 'input' && (
+            <WorkInputForm onComplete={handleInputComplete} />
+          )}
 
-        {activeTab === 'records' && (
-          <RecordsList onEdit={handleRecordEdit} />
-        )}
+          {activeTab === 'records' && (
+            <RecordsList onEdit={handleRecordEdit} />
+          )}
 
-        {activeTab === 'settings' && <SettingsPage />}
-      </main>
+          {activeTab === 'settings' && <SettingsPage />}
+        </main>
 
-      <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-    </div>
+        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      </div>
+    </AuthGate>
   );
 };
 
