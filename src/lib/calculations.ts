@@ -31,6 +31,12 @@ export function parseDate(dateString: string): Date {
   return new Date(dateString);
 }
 
+export function calculateActualDeliveries(record: WorkRecord): number {
+  // 실제 배송 완료 수량 = 할당 - 취소 - 미완료 - 이관 + 추가
+  const { allocated, cancelled, incomplete, transferred, added } = record.delivery;
+  return Math.max(0, allocated - cancelled - incomplete - transferred + added);
+}
+
 export function calculateDailyIncome(
   records: WorkRecord[],
   settings: Settings
@@ -40,8 +46,9 @@ export function calculateDailyIncome(
   for (const record of records) {
     const routeRate = settings.routes[record.route];
 
-    // Delivery income
-    total += record.delivery.completed * routeRate;
+    // Delivery income - 실제 배송 완료 수량 기준
+    const actualDeliveries = calculateActualDeliveries(record);
+    total += actualDeliveries * routeRate;
 
     // Returns income
     total += (record.returns.completed + record.returns.numbered) * routeRate;
@@ -95,15 +102,16 @@ export function calculatePeriodSummary(
   for (const record of periodRecords) {
     const routeRate = settings.routes[record.route];
 
-    // Count deliveries
-    totalDeliveries += record.delivery.completed;
+    // Count deliveries - 실제 배송 완료 수량 기준
+    const actualDeliveries = calculateActualDeliveries(record);
+    totalDeliveries += actualDeliveries;
 
     // Count fresh bags
     totalFreshBags +=
       record.freshBag.regular + record.freshBag.standalone;
 
-    // Calculate income
-    totalIncome += record.delivery.completed * routeRate;
+    // Calculate income - 실제 배송 완료 수량 기준
+    totalIncome += actualDeliveries * routeRate;
     totalIncome += (record.returns.completed + record.returns.numbered) * routeRate;
     totalIncome += record.freshBag.regular * settings.freshBag.regular;
     totalIncome += record.freshBag.standalone * settings.freshBag.standalone;
