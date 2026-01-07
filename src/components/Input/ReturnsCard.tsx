@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Plus, Minus, ChevronDown, ChevronUp, Award, Save } from 'lucide-react';
+import { Plus, Minus, ChevronDown, ChevronUp, RotateCcw, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { RouteType, DeliveryData } from '@/types';
+import { ReturnsData } from '@/types';
 import { toast } from 'sonner';
 
 interface NumberFieldProps {
@@ -24,10 +24,6 @@ function NumberField({ label, value, onChange, type = 'default' }: NumberFieldPr
     positive: 'bg-success/10',
   };
 
-  const handleTempSave = () => {
-    toast.success('임시 저장됨');
-  };
-
   return (
     <div className={cn('flex items-center justify-between p-3 rounded-xl', bgColors[type])}>
       <div className="flex items-center gap-2">
@@ -38,7 +34,7 @@ function NumberField({ label, value, onChange, type = 'default' }: NumberFieldPr
         </span>
         <button
           type="button"
-          onClick={handleTempSave}
+          onClick={() => toast.success('임시 저장됨')}
           className="p-1 rounded hover:bg-background/50 transition-colors"
         >
           <Save className="w-3 h-3 text-muted-foreground" />
@@ -75,28 +71,24 @@ function NumberField({ label, value, onChange, type = 'default' }: NumberFieldPr
   );
 }
 
-interface RouteCardProps {
-  route: RouteType;
-  data: DeliveryData;
-  onChange: (data: DeliveryData) => void;
+interface ReturnsCardProps {
+  data: ReturnsData;
+  onChange: (data: ReturnsData) => void;
   unitPrice: number;
 }
 
-export function RouteCard({ route, data, onChange, unitPrice }: RouteCardProps) {
+export function ReturnsCard({ data, onChange, unitPrice }: ReturnsCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // 실제 배송 완료 수량 계산
-  const actualCompleted = Math.max(
-    0,
-    data.allocated - data.cancelled - data.incomplete - data.transferred + data.added
-  );
-
-  // 예상 수익 계산
-  const estimatedIncome = actualCompleted * unitPrice;
-
-  const updateField = (field: keyof DeliveryData, value: number) => {
+  const updateField = (field: keyof ReturnsData, value: number) => {
     onChange({ ...data, [field]: value });
   };
+
+  // 실제 완료 수량 (완료 + 채번)
+  const actualCompleted = data.completed + data.numbered;
+  
+  // 예상 수익
+  const estimatedIncome = actualCompleted * unitPrice;
 
   return (
     <div className="bg-card rounded-2xl shadow-card border border-border/30 overflow-hidden">
@@ -104,18 +96,16 @@ export function RouteCard({ route, data, onChange, unitPrice }: RouteCardProps) 
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-primary/5 to-primary/10"
+        className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-warning/5 to-warning/10"
       >
         <div className="flex items-center gap-3">
-          <span className="text-lg font-bold text-primary">{route}</span>
-          <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full font-medium">
-            {unitPrice.toLocaleString()}원/건
-          </span>
+          <RotateCcw className="w-5 h-5 text-warning" />
+          <span className="text-lg font-bold text-warning">반품</span>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div className="text-xs text-muted-foreground">예상 수익</div>
-            <div className="text-sm font-bold text-primary">
+            <div className="text-xs text-muted-foreground">완료 {actualCompleted}건</div>
+            <div className="text-sm font-bold text-warning">
               {estimatedIncome.toLocaleString()}원
             </div>
           </div>
@@ -133,25 +123,32 @@ export function RouteCard({ route, data, onChange, unitPrice }: RouteCardProps) 
           {/* 할당 수량 */}
           <NumberField
             label="할당"
-            value={data.allocated}
+            value={data.allocated || 0}
             onChange={(v) => updateField('allocated', v)}
           />
 
-          {/* 실제 완료 (자동 계산, 표시용) */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-success/10 border-2 border-success/20">
-            <div className="flex items-center gap-2">
-              <Award className="w-4 h-4 text-success" />
-              <span className="text-sm font-semibold text-success">실제 완료</span>
-            </div>
-            <span className="text-xl font-bold text-success">{actualCompleted}</span>
-          </div>
-
-          {/* 차감 항목들 */}
+          {/* 완료 항목 */}
           <div className="grid grid-cols-2 gap-2">
             <NumberField
-              label="취소"
-              value={data.cancelled}
-              onChange={(v) => updateField('cancelled', v)}
+              label="완료"
+              value={data.completed}
+              onChange={(v) => updateField('completed', v)}
+              type="positive"
+            />
+            <NumberField
+              label="채번"
+              value={data.numbered}
+              onChange={(v) => updateField('numbered', v)}
+              type="positive"
+            />
+          </div>
+
+          {/* 미완료 항목 */}
+          <div className="grid grid-cols-2 gap-2">
+            <NumberField
+              label="미회수"
+              value={data.notCollected}
+              onChange={(v) => updateField('notCollected', v)}
               type="negative"
             />
             <NumberField
@@ -159,22 +156,6 @@ export function RouteCard({ route, data, onChange, unitPrice }: RouteCardProps) 
               value={data.incomplete}
               onChange={(v) => updateField('incomplete', v)}
               type="negative"
-            />
-          </div>
-
-          {/* 이관/추가 */}
-          <div className="grid grid-cols-2 gap-2">
-            <NumberField
-              label="이관"
-              value={data.transferred}
-              onChange={(v) => updateField('transferred', v)}
-              type="negative"
-            />
-            <NumberField
-              label="추가"
-              value={data.added}
-              onChange={(v) => updateField('added', v)}
-              type="positive"
             />
           </div>
         </div>
