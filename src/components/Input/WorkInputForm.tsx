@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Minus, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useStore } from '@/store/useStore';
-import { WorkRecord, RouteType, RoundType } from '@/types';
+import { WorkRecord, RoundType } from '@/types';
 import { formatDate } from '@/lib/calculations';
 import { cn } from '@/lib/utils';
+import { SmartAllocationInput } from './SmartAllocationInput';
+import { RouteCard } from './RouteCard';
+import { toast } from 'sonner';
 
 interface NumberInputProps {
   label: string;
@@ -15,7 +18,7 @@ interface NumberInputProps {
 
 function NumberInput({ label, value, onChange, min = 0 }: NumberInputProps) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-border last:border-b-0">
+    <div className="flex items-center justify-between py-3 border-b border-border/50 last:border-b-0">
       <span className="text-sm font-medium">{label}</span>
       <div className="flex items-center gap-2">
         <button
@@ -25,7 +28,14 @@ function NumberInput({ label, value, onChange, min = 0 }: NumberInputProps) {
         >
           <Minus className="w-4 h-4" />
         </button>
-        <span className="w-12 text-center text-lg font-semibold">{value}</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={value || ''}
+          onChange={(e) => onChange(parseInt(e.target.value.replace(/\D/g, '')) || 0)}
+          className="w-14 h-10 text-center text-lg font-semibold bg-muted rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+        />
         <button
           type="button"
           onClick={() => onChange(value + 1)}
@@ -39,15 +49,27 @@ function NumberInput({ label, value, onChange, min = 0 }: NumberInputProps) {
 }
 
 export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
-  const { addRecord } = useStore();
+  const { addRecord, settings } = useStore();
   const [date, setDate] = useState(formatDate(new Date()));
-  const [route, setRoute] = useState<RouteType>('203D');
   const [round, setRound] = useState<RoundType>(1);
 
-  const [delivery, setDelivery] = useState({
+  // 라우트별 배송 데이터
+  const [delivery203D, setDelivery203D] = useState({
+    allocated: 0,
     completed: 0,
     cancelled: 0,
     incomplete: 0,
+    transferred: 0,
+    added: 0,
+  });
+
+  const [delivery206A, setDelivery206A] = useState({
+    allocated: 0,
+    completed: 0,
+    cancelled: 0,
+    incomplete: 0,
+    transferred: 0,
+    added: 0,
   });
 
   const [returns, setReturns] = useState({
@@ -65,6 +87,12 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     incomplete: 0,
   });
 
+  // 스마트 할당에서 값 받기
+  const handleAllocationChange = (allocations: { '203D': number; '206A': number }) => {
+    setDelivery203D(prev => ({ ...prev, allocated: allocations['203D'] }));
+    setDelivery206A(prev => ({ ...prev, allocated: allocations['206A'] }));
+  };
+
   const adjustDate = (days: number) => {
     const current = new Date(date);
     current.setDate(current.getDate() + days);
@@ -72,36 +100,48 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   };
 
   const handleSubmit = () => {
-    const record: WorkRecord = {
-      id: `${date}-${route}-${round}-${Date.now()}`,
-      date,
-      route,
-      round,
-      delivery,
-      returns,
-      freshBag,
-    };
+    // 203D 라우트 저장
+    if (delivery203D.allocated > 0 || delivery203D.added > 0) {
+      const record203D: WorkRecord = {
+        id: `${date}-203D-${round}-${Date.now()}`,
+        date,
+        route: '203D',
+        round,
+        delivery: delivery203D,
+        returns: round === 1 ? returns : { completed: 0, notCollected: 0, numbered: 0, incomplete: 0 },
+        freshBag: round === 1 ? freshBag : { regular: 0, standalone: 0, failedNotOut: 0, failedWithProducts: 0, incomplete: 0 },
+      };
+      addRecord(record203D);
+    }
 
-    addRecord(record);
+    // 206A 라우트 저장
+    if (delivery206A.allocated > 0 || delivery206A.added > 0) {
+      const record206A: WorkRecord = {
+        id: `${date}-206A-${round}-${Date.now() + 1}`,
+        date,
+        route: '206A',
+        round,
+        delivery: delivery206A,
+        returns: { completed: 0, notCollected: 0, numbered: 0, incomplete: 0 },
+        freshBag: { regular: 0, standalone: 0, failedNotOut: 0, failedWithProducts: 0, incomplete: 0 },
+      };
+      addRecord(record206A);
+    }
 
     // Reset form
-    setDelivery({ completed: 0, cancelled: 0, incomplete: 0 });
+    setDelivery203D({ allocated: 0, completed: 0, cancelled: 0, incomplete: 0, transferred: 0, added: 0 });
+    setDelivery206A({ allocated: 0, completed: 0, cancelled: 0, incomplete: 0, transferred: 0, added: 0 });
     setReturns({ completed: 0, notCollected: 0, numbered: 0, incomplete: 0 });
-    setFreshBag({
-      regular: 0,
-      standalone: 0,
-      failedNotOut: 0,
-      failedWithProducts: 0,
-      incomplete: 0,
-    });
+    setFreshBag({ regular: 0, standalone: 0, failedNotOut: 0, failedWithProducts: 0, incomplete: 0 });
 
+    toast.success('작업 기록이 저장되었습니다!');
     onComplete?.();
   };
 
   return (
     <div className="space-y-5 animate-slide-up">
       {/* Date Selector */}
-      <div className="bg-card rounded-2xl p-4 shadow-card">
+      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
         <label className="text-xs font-medium text-muted-foreground mb-2 block">
           날짜
         </label>
@@ -129,79 +169,53 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         </div>
       </div>
 
-      {/* Route & Round Selector */}
-      <div className="bg-card rounded-2xl p-4 shadow-card">
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-2 block">
-              노선
-            </label>
-            <div className="flex gap-2">
-              {(['203D', '206A'] as RouteType[]).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRoute(r)}
-                  className={cn(
-                    'flex-1 touch-target py-3 rounded-xl font-semibold text-sm transition-all',
-                    route === r
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  )}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-2 block">
-              회차
-            </label>
-            <div className="flex gap-2">
-              {([1, 2] as RoundType[]).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRound(r)}
-                  className={cn(
-                    'flex-1 touch-target py-3 rounded-xl font-semibold text-sm transition-all',
-                    round === r
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  )}
-                >
-                  {r}회차
-                </button>
-              ))}
-            </div>
-          </div>
+      {/* Round Selector */}
+      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
+        <label className="text-xs font-medium text-muted-foreground mb-2 block">
+          회차
+        </label>
+        <div className="flex gap-2">
+          {([1, 2] as RoundType[]).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRound(r)}
+              className={cn(
+                'flex-1 touch-target py-3 rounded-xl font-semibold text-sm transition-all',
+                round === r
+                  ? 'bg-primary text-primary-foreground shadow-md'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              )}
+            >
+              {r}회차
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Delivery Section */}
-      <div className="bg-card rounded-2xl p-4 shadow-card">
-        <h3 className="text-sm font-semibold text-primary mb-3">배송</h3>
-        <NumberInput
-          label="완료"
-          value={delivery.completed}
-          onChange={(v) => setDelivery({ ...delivery, completed: v })}
-        />
-        <NumberInput
-          label="취소"
-          value={delivery.cancelled}
-          onChange={(v) => setDelivery({ ...delivery, cancelled: v })}
-        />
-        <NumberInput
-          label="미완료"
-          value={delivery.incomplete}
-          onChange={(v) => setDelivery({ ...delivery, incomplete: v })}
-        />
-      </div>
+      {/* Smart Allocation Input */}
+      <SmartAllocationInput onAllocationChange={handleAllocationChange} date={date} />
+
+      {/* Route Cards */}
+      <RouteCard
+        route="203D"
+        data={delivery203D}
+        onChange={setDelivery203D}
+        unitPrice={settings.routes['203D']}
+      />
+      <RouteCard
+        route="206A"
+        data={delivery206A}
+        onChange={setDelivery206A}
+        unitPrice={settings.routes['206A']}
+      />
 
       {/* Returns Section */}
-      <div className="bg-card rounded-2xl p-4 shadow-card">
-        <h3 className="text-sm font-semibold text-warning mb-3">반품</h3>
+      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
+        <h3 className="text-sm font-semibold text-warning mb-3 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-warning"></span>
+          반품
+        </h3>
         <NumberInput
           label="완료"
           value={returns.completed}
@@ -225,8 +239,11 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
       </div>
 
       {/* Fresh Bag Section */}
-      <div className="bg-card rounded-2xl p-4 shadow-card">
-        <h3 className="text-sm font-semibold text-success mb-3">프레시백</h3>
+      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
+        <h3 className="text-sm font-semibold text-success mb-3 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-success"></span>
+          프레시백
+        </h3>
         <NumberInput
           label="일반(연계)"
           value={freshBag.regular}
@@ -257,7 +274,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
       {/* Submit Button */}
       <Button
         onClick={handleSubmit}
-        className="w-full touch-target h-14 text-base font-semibold rounded-xl"
+        className="w-full touch-target h-14 text-base font-semibold rounded-xl shadow-lg"
         size="lg"
       >
         <Check className="w-5 h-5 mr-2" />

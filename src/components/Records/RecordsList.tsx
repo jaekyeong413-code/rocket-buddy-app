@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ChevronRight, Edit2, Trash2, Package, Truck } from 'lucide-react';
+import { Edit2, Trash2, Package, Truck, ArrowRightLeft, Plus } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { WorkRecord } from '@/types';
-import { formatCurrency } from '@/lib/calculations';
+import { formatCurrency, calculateActualDeliveries } from '@/lib/calculations';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 interface RecordItemProps {
   record: WorkRecord;
@@ -25,25 +26,28 @@ interface RecordItemProps {
 function RecordItem({ record, onEdit, onDelete, routeRate, fbRates }: RecordItemProps) {
   const [showDelete, setShowDelete] = useState(false);
   
+  const actualDeliveries = calculateActualDeliveries(record);
   const income =
-    record.delivery.completed * routeRate +
+    actualDeliveries * routeRate +
     (record.returns.completed + record.returns.numbered) * routeRate +
     record.freshBag.regular * fbRates.regular +
     record.freshBag.standalone * fbRates.standalone;
 
   return (
     <>
-      <div className="bg-card rounded-xl p-4 shadow-card animate-slide-up">
+      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30 animate-slide-up">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="text-sm font-bold text-primary">{record.route}</span>
-            <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-muted px-2 py-0.5 rounded-full font-medium">
               {record.round}회차
             </span>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => onEdit(record)}
+              onClick={() => {
+                toast.info('수정 기능은 곧 추가됩니다');
+              }}
               className="p-2 rounded-lg hover:bg-muted transition-colors"
             >
               <Edit2 className="w-4 h-4 text-muted-foreground" />
@@ -57,22 +61,39 @@ function RecordItem({ record, onEdit, onDelete, routeRate, fbRates }: RecordItem
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 text-center mb-3">
-          <div className="bg-accent/50 rounded-lg p-2">
-            <div className="flex items-center justify-center gap-1 text-primary">
-              <Truck className="w-3 h-3" />
-              <span className="text-xs">배송</span>
-            </div>
-            <div className="text-lg font-bold">{record.delivery.completed}</div>
+        {/* 배송 상세 */}
+        <div className="bg-accent/30 rounded-xl p-3 mb-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+            <span>할당 {record.delivery.allocated}</span>
+            {record.delivery.transferred > 0 && (
+              <span className="flex items-center gap-1 text-destructive">
+                <ArrowRightLeft className="w-3 h-3" />
+                이관 -{record.delivery.transferred}
+              </span>
+            )}
+            {record.delivery.added > 0 && (
+              <span className="flex items-center gap-1 text-success">
+                <Plus className="w-3 h-3" />
+                추가 +{record.delivery.added}
+              </span>
+            )}
           </div>
-          <div className="bg-warning/10 rounded-lg p-2">
+          <div className="flex items-center justify-center gap-2">
+            <Truck className="w-4 h-4 text-primary" />
+            <span className="text-2xl font-bold text-primary">{actualDeliveries}</span>
+            <span className="text-sm text-muted-foreground">건 완료</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-center mb-3">
+          <div className="bg-warning/10 rounded-xl p-2">
             <div className="flex items-center justify-center gap-1 text-warning">
               <Package className="w-3 h-3" />
               <span className="text-xs">반품</span>
             </div>
             <div className="text-lg font-bold">{record.returns.completed}</div>
           </div>
-          <div className="bg-success/10 rounded-lg p-2">
+          <div className="bg-success/10 rounded-xl p-2">
             <div className="flex items-center justify-center gap-1 text-success">
               <Package className="w-3 h-3" />
               <span className="text-xs">FB</span>
@@ -83,7 +104,7 @@ function RecordItem({ record, onEdit, onDelete, routeRate, fbRates }: RecordItem
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-border">
+        <div className="flex items-center justify-between pt-3 border-t border-border/50">
           <span className="text-xs text-muted-foreground">예상 수입</span>
           <span className="text-sm font-bold text-primary">
             {formatCurrency(income)}
@@ -92,7 +113,7 @@ function RecordItem({ record, onEdit, onDelete, routeRate, fbRates }: RecordItem
       </div>
 
       <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>기록 삭제</AlertDialogTitle>
             <AlertDialogDescription>
@@ -100,10 +121,10 @@ function RecordItem({ record, onEdit, onDelete, routeRate, fbRates }: RecordItem
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl">취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => onDelete(record.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
             >
               삭제
             </AlertDialogAction>
