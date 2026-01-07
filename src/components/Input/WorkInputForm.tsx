@@ -1,97 +1,88 @@
-import { useState, useEffect } from 'react';
-import { Plus, Minus, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useStore } from '@/store/useStore';
-import { WorkRecord, RoundType } from '@/types';
-import { formatDate } from '@/lib/calculations';
+import { WorkRecord, RoundType, DeliveryData, ReturnsData, FreshBagData } from '@/types';
+import { 
+  formatDate, 
+  createDefaultDeliveryData, 
+  createDefaultReturnsData, 
+  createDefaultFreshBagData,
+  calculateDailyIncome,
+  formatCurrency,
+} from '@/lib/calculations';
 import { cn } from '@/lib/utils';
 import { SmartAllocationInput } from './SmartAllocationInput';
 import { RouteCard } from './RouteCard';
+import { ReturnsCard } from './ReturnsCard';
+import { FreshBagCard } from './FreshBagCard';
 import { toast } from 'sonner';
 
-interface NumberInputProps {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-}
-
-function NumberInput({ label, value, onChange, min = 0 }: NumberInputProps) {
-  return (
-    <div className="flex items-center justify-between py-3 border-b border-border/50 last:border-b-0">
-      <span className="text-sm font-medium">{label}</span>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onChange(Math.max(min, value - 1))}
-          className="touch-target flex items-center justify-center w-10 h-10 rounded-full bg-muted hover:bg-muted/80 active:scale-95 transition-transform"
-        >
-          <Minus className="w-4 h-4" />
-        </button>
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={value || ''}
-          onChange={(e) => onChange(parseInt(e.target.value.replace(/\D/g, '')) || 0)}
-          className="w-14 h-10 text-center text-lg font-semibold bg-muted rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-        />
-        <button
-          type="button"
-          onClick={() => onChange(value + 1)}
-          className="touch-target flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-transform"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
-  const { addRecord, settings } = useStore();
+  const { addRecord, updateRecord, records, settings } = useStore();
   const [date, setDate] = useState(formatDate(new Date()));
   const [round, setRound] = useState<RoundType>(1);
 
+  // 라우트별 할당 (스마트 할당용)
+  const [allocations, setAllocations] = useState({
+    '203D': 0,
+    '206A': 0,
+  });
+
   // 라우트별 배송 데이터
-  const [delivery203D, setDelivery203D] = useState({
-    allocated: 0,
-    completed: 0,
-    cancelled: 0,
-    incomplete: 0,
-    transferred: 0,
-    added: 0,
-  });
+  const [delivery203D, setDelivery203D] = useState<DeliveryData>(createDefaultDeliveryData());
+  const [delivery206A, setDelivery206A] = useState<DeliveryData>(createDefaultDeliveryData());
 
-  const [delivery206A, setDelivery206A] = useState({
-    allocated: 0,
-    completed: 0,
-    cancelled: 0,
-    incomplete: 0,
-    transferred: 0,
-    added: 0,
-  });
+  const [returns, setReturns] = useState<ReturnsData>(createDefaultReturnsData());
+  const [freshBag, setFreshBag] = useState<FreshBagData>(createDefaultFreshBagData());
 
-  const [returns, setReturns] = useState({
-    completed: 0,
-    notCollected: 0,
-    numbered: 0,
-    incomplete: 0,
-  });
+  // 할당 변경 시 라우트 데이터에 반영
+  const handleAllocationChange = useCallback((newAllocations: { '203D': number; '206A': number }) => {
+    setAllocations(newAllocations);
+    setDelivery203D(prev => ({ ...prev, allocated: newAllocations['203D'] }));
+    setDelivery206A(prev => ({ ...prev, allocated: newAllocations['206A'] }));
+  }, []);
 
-  const [freshBag, setFreshBag] = useState({
-    regular: 0,
-    standalone: 0,
-    failedNotOut: 0,
-    failedWithProducts: 0,
-    incomplete: 0,
-  });
+  // 개별 라우트 할당 변경 시 전체 할당에도 반영 (양방향 연동)
+  const handleDelivery203DChange = useCallback((data: DeliveryData) => {
+    setDelivery203D(data);
+    setAllocations(prev => ({ ...prev, '203D': data.allocated }));
+  }, []);
 
-  // 스마트 할당에서 값 받기
-  const handleAllocationChange = (allocations: { '203D': number; '206A': number }) => {
-    setDelivery203D(prev => ({ ...prev, allocated: allocations['203D'] }));
-    setDelivery206A(prev => ({ ...prev, allocated: allocations['206A'] }));
-  };
+  const handleDelivery206AChange = useCallback((data: DeliveryData) => {
+    setDelivery206A(data);
+    setAllocations(prev => ({ ...prev, '206A': data.allocated }));
+  }, []);
+
+  // 오늘 예상 수입 실시간 계산
+  const todayRecords = records.filter(r => r.date === date);
+  const currentInputAsRecords: WorkRecord[] = [];
+  
+  if (delivery203D.allocated > 0 || delivery203D.added > 0) {
+    currentInputAsRecords.push({
+      id: 'temp-203d',
+      date,
+      route: '203D',
+      round,
+      delivery: delivery203D,
+      returns,
+      freshBag,
+    });
+  }
+  
+  if (delivery206A.allocated > 0 || delivery206A.added > 0) {
+    currentInputAsRecords.push({
+      id: 'temp-206a',
+      date,
+      route: '206A',
+      round,
+      delivery: delivery206A,
+      returns: createDefaultReturnsData(),
+      freshBag: createDefaultFreshBagData(),
+    });
+  }
+
+  const estimatedIncome = calculateDailyIncome([...todayRecords, ...currentInputAsRecords], settings);
 
   const adjustDate = (days: number) => {
     const current = new Date(date);
@@ -108,8 +99,8 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         route: '203D',
         round,
         delivery: delivery203D,
-        returns: round === 1 ? returns : { completed: 0, notCollected: 0, numbered: 0, incomplete: 0 },
-        freshBag: round === 1 ? freshBag : { regular: 0, standalone: 0, failedNotOut: 0, failedWithProducts: 0, incomplete: 0 },
+        returns: round === 1 ? returns : createDefaultReturnsData(),
+        freshBag: round === 1 ? freshBag : createDefaultFreshBagData(),
       };
       addRecord(record203D);
     }
@@ -122,17 +113,18 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         route: '206A',
         round,
         delivery: delivery206A,
-        returns: { completed: 0, notCollected: 0, numbered: 0, incomplete: 0 },
-        freshBag: { regular: 0, standalone: 0, failedNotOut: 0, failedWithProducts: 0, incomplete: 0 },
+        returns: createDefaultReturnsData(),
+        freshBag: createDefaultFreshBagData(),
       };
       addRecord(record206A);
     }
 
     // Reset form
-    setDelivery203D({ allocated: 0, completed: 0, cancelled: 0, incomplete: 0, transferred: 0, added: 0 });
-    setDelivery206A({ allocated: 0, completed: 0, cancelled: 0, incomplete: 0, transferred: 0, added: 0 });
-    setReturns({ completed: 0, notCollected: 0, numbered: 0, incomplete: 0 });
-    setFreshBag({ regular: 0, standalone: 0, failedNotOut: 0, failedWithProducts: 0, incomplete: 0 });
+    setAllocations({ '203D': 0, '206A': 0 });
+    setDelivery203D(createDefaultDeliveryData());
+    setDelivery206A(createDefaultDeliveryData());
+    setReturns(createDefaultReturnsData());
+    setFreshBag(createDefaultFreshBagData());
 
     toast.success('작업 기록이 저장되었습니다!');
     onComplete?.();
@@ -140,6 +132,14 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
 
   return (
     <div className="space-y-5 animate-slide-up">
+      {/* 실시간 예상 수입 표시 */}
+      <div className="bg-gradient-primary rounded-2xl p-4 text-primary-foreground">
+        <div className="flex items-center justify-between">
+          <span className="text-sm opacity-80">오늘 예상 수입</span>
+          <span className="text-2xl font-bold">{formatCurrency(estimatedIncome)}</span>
+        </div>
+      </div>
+
       {/* Date Selector */}
       <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
         <label className="text-xs font-medium text-muted-foreground mb-2 block">
@@ -194,82 +194,40 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
       </div>
 
       {/* Smart Allocation Input */}
-      <SmartAllocationInput onAllocationChange={handleAllocationChange} date={date} />
+      <SmartAllocationInput 
+        onAllocationChange={handleAllocationChange}
+        allocations={allocations}
+        date={date}
+      />
 
       {/* Route Cards */}
       <RouteCard
         route="203D"
         data={delivery203D}
-        onChange={setDelivery203D}
+        onChange={handleDelivery203DChange}
         unitPrice={settings.routes['203D']}
       />
       <RouteCard
         route="206A"
         data={delivery206A}
-        onChange={setDelivery206A}
+        onChange={handleDelivery206AChange}
         unitPrice={settings.routes['206A']}
       />
 
-      {/* Returns Section */}
-      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
-        <h3 className="text-sm font-semibold text-warning mb-3 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-warning"></span>
-          반품
-        </h3>
-        <NumberInput
-          label="완료"
-          value={returns.completed}
-          onChange={(v) => setReturns({ ...returns, completed: v })}
-        />
-        <NumberInput
-          label="미회수"
-          value={returns.notCollected}
-          onChange={(v) => setReturns({ ...returns, notCollected: v })}
-        />
-        <NumberInput
-          label="채번"
-          value={returns.numbered}
-          onChange={(v) => setReturns({ ...returns, numbered: v })}
-        />
-        <NumberInput
-          label="미완료"
-          value={returns.incomplete}
-          onChange={(v) => setReturns({ ...returns, incomplete: v })}
-        />
-      </div>
+      {/* Returns Card */}
+      <ReturnsCard
+        data={returns}
+        onChange={setReturns}
+        unitPrice={settings.routes['203D']} // 기본 단가 사용
+      />
 
-      {/* Fresh Bag Section */}
-      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
-        <h3 className="text-sm font-semibold text-success mb-3 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-success"></span>
-          프레시백
-        </h3>
-        <NumberInput
-          label="일반(연계)"
-          value={freshBag.regular}
-          onChange={(v) => setFreshBag({ ...freshBag, regular: v })}
-        />
-        <NumberInput
-          label="단독"
-          value={freshBag.standalone}
-          onChange={(v) => setFreshBag({ ...freshBag, standalone: v })}
-        />
-        <NumberInput
-          label="미내놓음"
-          value={freshBag.failedNotOut}
-          onChange={(v) => setFreshBag({ ...freshBag, failedNotOut: v })}
-        />
-        <NumberInput
-          label="상품잔존"
-          value={freshBag.failedWithProducts}
-          onChange={(v) => setFreshBag({ ...freshBag, failedWithProducts: v })}
-        />
-        <NumberInput
-          label="미완료"
-          value={freshBag.incomplete}
-          onChange={(v) => setFreshBag({ ...freshBag, incomplete: v })}
-        />
-      </div>
+      {/* Fresh Bag Card */}
+      <FreshBagCard
+        data={freshBag}
+        onChange={setFreshBag}
+        regularRate={settings.freshBag.regular}
+        standaloneRate={settings.freshBag.standalone}
+      />
 
       {/* Submit Button */}
       <Button
