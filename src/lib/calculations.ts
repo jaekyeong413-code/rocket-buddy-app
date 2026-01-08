@@ -442,3 +442,59 @@ export function createDefaultFreshBagData(): FreshBagData {
     incomplete: 0,
   };
 }
+// FB 회수율 계산 (일반 / 단독)
+export function calculateFBCollectionRate(records: WorkRecord[]): {
+  regularRate: number;
+  standaloneRate: number;
+} {
+  let regularAllocated = 0;
+  let regularCompleted = 0;
+
+  let standaloneAllocated = 0;
+  let standaloneCompleted = 0;
+
+  for (const record of records) {
+    const fb = record.freshBag;
+
+    // 할당
+    const regAlloc = (fb.regularAllocated || 0) + (fb.regularAdjustment || 0);
+    const stanAlloc =
+      (fb.standaloneAllocated || 0) -
+      (fb.regularAdjustment || 0) -
+      (fb.transferred || 0) +
+      (fb.added || 0);
+
+    // 미회수
+    const failed =
+      (fb.failedAbsent || 0) +
+      (fb.failedNoProduct || 0) +
+      (fb.failedWithProducts || 0);
+
+    // 완료 = 할당 - 미회수
+    const completedTotal = Math.max(0, regAlloc + stanAlloc - failed);
+
+    const regCompleted =
+      regAlloc + stanAlloc > 0
+        ? Math.round((completedTotal * regAlloc) / (regAlloc + stanAlloc))
+        : 0;
+
+    const stanCompleted = completedTotal - regCompleted;
+
+    regularAllocated += regAlloc;
+    regularCompleted += regCompleted;
+
+    standaloneAllocated += stanAlloc;
+    standaloneCompleted += stanCompleted;
+  }
+
+  return {
+    regularRate:
+      regularAllocated > 0
+        ? Math.round((regularCompleted / regularAllocated) * 100)
+        : 0,
+    standaloneRate:
+      standaloneAllocated > 0
+        ? Math.round((standaloneCompleted / standaloneAllocated) * 100)
+        : 0,
+  };
+}
