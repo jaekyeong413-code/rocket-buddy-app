@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Package, TrendingUp, Truck, Award, Sparkles, ChevronRight, X, RotateCcw, ArrowDownUp, Wallet } from 'lucide-react';
+import { Package, TrendingUp, Truck, Award, Sparkles, ChevronRight, RotateCcw, Wallet } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import {
   calculatePeriodSummary,
   formatCurrency,
   formatPercent,
   getTodayRecords,
-  calculateActualDeliveries,
   calculateDailyIncome,
   calculateDailyIncomeDetails,
   calculateDeliveryProgress,
@@ -82,7 +81,7 @@ export function TodayIncomeCard() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Wallet className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium text-muted-foreground">오늘의 수입</span>
+              <span className="text-sm font-medium text-muted-foreground">오늘의 예상 수입</span>
             </div>
             <div className="text-2xl font-bold text-foreground">
               {formatCurrency(todayIncome)}
@@ -102,7 +101,6 @@ export function TodayIncomeCard() {
           </DialogHeader>
           
           <div className="space-y-4 mt-4">
-            {/* 라우트별 수입 */}
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-muted-foreground">배송 수입</h4>
               {details.routeIncomes.length > 0 ? (
@@ -120,26 +118,32 @@ export function TodayIncomeCard() {
               )}
             </div>
 
-            {/* 반품 수입 */}
             <div className="flex items-center justify-between p-3 bg-warning/10 rounded-xl">
-              <span className="text-sm font-medium text-warning">반품</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-warning">반품</span>
+                <span className="text-xs text-muted-foreground">{details.returnsCount}건</span>
+              </div>
               <span className="font-medium">{formatCurrency(details.returnsIncome)}</span>
             </div>
 
-            {/* FB 수입 */}
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-muted-foreground">프레시백</h4>
               <div className="flex items-center justify-between p-3 bg-success/10 rounded-xl">
-                <span className="text-sm font-medium text-success">일반(연계)</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-success">일반(연계)</span>
+                  <span className="text-xs text-muted-foreground">{details.fbCount.regular}건</span>
+                </div>
                 <span className="font-medium">{formatCurrency(details.fbIncome.regular)}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-success/10 rounded-xl">
-                <span className="text-sm font-medium text-success">단독</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-success">단독</span>
+                  <span className="text-xs text-muted-foreground">{details.fbCount.standalone}건</span>
+                </div>
                 <span className="font-medium">{formatCurrency(details.fbIncome.standalone)}</span>
               </div>
             </div>
 
-            {/* FB 인센티브 */}
             {(details.fbIncentive.regular > 0 || details.fbIncentive.standalone > 0) && (
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
@@ -161,7 +165,6 @@ export function TodayIncomeCard() {
               </div>
             )}
 
-            {/* 합계 */}
             <div className="pt-4 border-t border-border">
               <div className="flex items-center justify-between">
                 <span className="text-lg font-semibold">오늘 총 수입</span>
@@ -196,7 +199,6 @@ export function TodayFBStatus() {
       </h3>
       
       <div className="space-y-4">
-        {/* 일반(연계) FB */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
@@ -232,7 +234,6 @@ export function TodayFBStatus() {
           </div>
         </div>
 
-        {/* 단독 FB */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
@@ -265,103 +266,6 @@ export function TodayFBStatus() {
               {standaloneAchieved ? `+${settings.incentive.standaloneBonus}원/건` : ''}
             </span>
             <span className="text-xs text-muted-foreground">목표 {standaloneTarget}%</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function CollectionRateGauge() {
-  const { settings, records } = useStore();
-  const summary = calculatePeriodSummary(records, settings);
-
-  const regularTarget = settings.incentive.regularThreshold;
-  const standaloneTarget = settings.incentive.standaloneThreshold;
-
-  const regularAchieved = summary.regularFBRate >= regularTarget;
-  const standaloneAchieved = summary.standaloneFBRate >= standaloneTarget;
-
-  return (
-    <div className="bg-card rounded-2xl p-5 shadow-card border border-border/30 animate-slide-up">
-      <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-primary"></span>
-        이번 달 FB 회수율
-      </h3>
-      <div className="space-y-4">
-        {/* Regular FB */}
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">일반(연계)</span>
-              {regularAchieved && (
-                <span className="flex items-center gap-1 px-2 py-0.5 bg-success/10 text-success text-xs rounded-full font-medium">
-                  <Award className="w-3 h-3" />
-                  달성!
-                </span>
-              )}
-            </div>
-            <span className={`text-sm font-bold ${regularAchieved ? 'text-success' : 'text-foreground'}`}>
-              {formatPercent(summary.regularFBRate)}
-            </span>
-          </div>
-          <div className="relative h-4 bg-muted rounded-full overflow-hidden">
-            <div
-              className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
-                regularAchieved ? 'bg-gradient-success' : 'bg-primary'
-              }`}
-              style={{ width: `${Math.min(100, summary.regularFBRate)}%` }}
-            />
-            <div
-              className="absolute inset-y-0 w-0.5 bg-destructive"
-              style={{ left: `${regularTarget}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-muted-foreground">
-              {regularAchieved ? `+${settings.incentive.regularBonus}원/건` : ''}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              목표 {regularTarget}%
-            </span>
-          </div>
-        </div>
-
-        {/* Standalone FB */}
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">단독</span>
-              {standaloneAchieved && (
-                <span className="flex items-center gap-1 px-2 py-0.5 bg-success/10 text-success text-xs rounded-full font-medium">
-                  <Award className="w-3 h-3" />
-                  달성!
-                </span>
-              )}
-            </div>
-            <span className={`text-sm font-bold ${standaloneAchieved ? 'text-success' : 'text-foreground'}`}>
-              {formatPercent(summary.standaloneFBRate)}
-            </span>
-          </div>
-          <div className="relative h-4 bg-muted rounded-full overflow-hidden">
-            <div
-              className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
-                standaloneAchieved ? 'bg-gradient-success' : 'bg-primary'
-              }`}
-              style={{ width: `${Math.min(100, summary.standaloneFBRate)}%` }}
-            />
-            <div
-              className="absolute inset-y-0 w-0.5 bg-destructive"
-              style={{ left: `${standaloneTarget}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-muted-foreground">
-              {standaloneAchieved ? `+${settings.incentive.standaloneBonus}원/건` : ''}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              목표 {standaloneTarget}%
-            </span>
           </div>
         </div>
       </div>
@@ -438,36 +342,31 @@ export function TodayStats() {
   const { records } = useStore();
   const todayRecords = getTodayRecords(records);
 
-  const stats = todayRecords.reduce(
-    (acc, record) => ({
-      deliveries: acc.deliveries + calculateActualDeliveries(record),
-      returns: acc.returns + record.returns.completed,
-      freshBags:
-        acc.freshBags +
-        record.freshBag.regular +
-        record.freshBag.standalone,
-    }),
-    { deliveries: 0, returns: 0, freshBags: 0 }
-  );
+  const deliveryProgress = calculateDeliveryProgress(todayRecords);
+  const returnsProgress = calculateReturnsProgress(todayRecords);
+  const fbProgress = calculateFBProgress(todayRecords);
 
   const items = [
     {
-      label: '배송 완료',
-      value: stats.deliveries,
+      label: '배송',
+      value: deliveryProgress.completed,
+      total: deliveryProgress.total,
       icon: Truck,
       color: 'text-primary',
       bg: 'bg-accent',
     },
     {
-      label: '반품 완료',
-      value: stats.returns,
+      label: '반품',
+      value: returnsProgress.completed,
+      total: returnsProgress.total,
       icon: RotateCcw,
       color: 'text-warning',
       bg: 'bg-warning/10',
     },
     {
-      label: 'FB 회수',
-      value: stats.freshBags,
+      label: 'FB',
+      value: fbProgress.completed,
+      total: fbProgress.total,
       icon: Package,
       color: 'text-success',
       bg: 'bg-success/10',
@@ -490,7 +389,7 @@ export function TodayStats() {
               {item.value}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {item.label}
+              {item.label} / {item.total}
             </div>
           </div>
         ))}

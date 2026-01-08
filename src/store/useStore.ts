@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Settings, WorkRecord, RouteAllocationHistory } from '@/types';
+import { Settings, WorkRecord, RouteAllocationHistory, TodayWorkData, DeliveryData, ReturnsData, FreshBagData } from '@/types';
+import { formatDate, createDefaultDeliveryData, createDefaultReturnsData, createDefaultFreshBagData } from '@/lib/calculations';
 
 interface AppState {
   settings: Settings;
   records: WorkRecord[];
   allocationHistory: RouteAllocationHistory[];
+  todayWorkData: TodayWorkData | null;
   updateSettings: (settings: Partial<Settings>) => void;
   addRecord: (record: WorkRecord) => void;
   updateRecord: (id: string, record: Partial<WorkRecord>) => void;
@@ -13,6 +15,10 @@ interface AppState {
   getRecordsByPeriod: (startDate: string, endDate: string) => WorkRecord[];
   addAllocationHistory: (history: RouteAllocationHistory) => void;
   getRouteRatio: () => { '203D': number; '206A': number };
+  // 오늘 작업 데이터 관리 (저장 후에도 유지)
+  updateTodayWorkData: (data: Partial<TodayWorkData>) => void;
+  getTodayWorkData: () => TodayWorkData;
+  resetTodayWorkData: () => void;
 }
 
 const defaultSettings: Settings = {
@@ -33,12 +39,26 @@ const defaultSettings: Settings = {
   monthlyFee: 500000,
 };
 
+const createDefaultTodayWorkData = (date: string): TodayWorkData => ({
+  date,
+  firstAllocationDelivery: 0,
+  firstAllocationReturns: 0,
+  totalRemainingAfterFirstRound: 0,
+  routes: {
+    '203D': createDefaultDeliveryData(),
+    '206A': createDefaultDeliveryData(),
+  },
+  returns: createDefaultReturnsData(),
+  freshBag: createDefaultFreshBagData(),
+});
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       settings: defaultSettings,
       records: [],
       allocationHistory: [],
+      todayWorkData: null,
       
       updateSettings: (newSettings) =>
         set((state) => ({
@@ -107,6 +127,38 @@ export const useStore = create<AppState>()(
           '206A': Math.round((total206A / totalAll) * 100),
         };
       },
+
+      updateTodayWorkData: (data) =>
+        set((state) => {
+          const today = formatDate(new Date());
+          const existing = state.todayWorkData?.date === today 
+            ? state.todayWorkData 
+            : createDefaultTodayWorkData(today);
+          
+          return {
+            todayWorkData: {
+              ...existing,
+              ...data,
+              date: today,
+            },
+          };
+        }),
+
+      getTodayWorkData: () => {
+        const state = get();
+        const today = formatDate(new Date());
+        
+        if (state.todayWorkData?.date === today) {
+          return state.todayWorkData;
+        }
+        
+        return createDefaultTodayWorkData(today);
+      },
+
+      resetTodayWorkData: () =>
+        set(() => ({
+          todayWorkData: createDefaultTodayWorkData(formatDate(new Date())),
+        })),
     }),
     {
       name: 'quickflex-storage',
