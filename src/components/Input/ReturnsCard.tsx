@@ -84,8 +84,8 @@ export function ReturnsCard({ data, onChange, unitPrice }: ReturnsCardProps) {
     onChange({ ...data, [field]: value });
   };
 
-  // 실제 완료 수량 (완료 + 채번)
-  const actualCompleted = data.completed + data.numbered;
+  // 완료 수량 계산 (전체 할당 - 미회수 = 완료)
+  const actualCompleted = Math.max(0, (data.allocated || 0) - (data.notCollected || 0));
   
   // 예상 수익
   const estimatedIncome = actualCompleted * unitPrice;
@@ -127,36 +127,18 @@ export function ReturnsCard({ data, onChange, unitPrice }: ReturnsCardProps) {
             onChange={(v) => updateField('allocated', v)}
           />
 
-          {/* 완료 항목 */}
-          <div className="grid grid-cols-2 gap-2">
-            <NumberField
-              label="완료"
-              value={data.completed}
-              onChange={(v) => updateField('completed', v)}
-              type="positive"
-            />
-            <NumberField
-              label="채번"
-              value={data.numbered}
-              onChange={(v) => updateField('numbered', v)}
-              type="positive"
-            />
-          </div>
+          {/* 미회수 (사유 버튼 없이 숫자만) */}
+          <NumberField
+            label="미회수"
+            value={data.notCollected || 0}
+            onChange={(v) => updateField('notCollected', v)}
+            type="negative"
+          />
 
-          {/* 미완료 항목 */}
-          <div className="grid grid-cols-2 gap-2">
-            <NumberField
-              label="미회수"
-              value={data.notCollected}
-              onChange={(v) => updateField('notCollected', v)}
-              type="negative"
-            />
-            <NumberField
-              label="미완료"
-              value={data.incomplete}
-              onChange={(v) => updateField('incomplete', v)}
-              type="negative"
-            />
+          {/* 완료 표시 (자동 계산) */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-success/10 border-2 border-success/20">
+            <span className="text-sm font-semibold text-success">완료 (할당 - 미회수)</span>
+            <span className="text-xl font-bold text-success">{actualCompleted}</span>
           </div>
         </div>
       )}

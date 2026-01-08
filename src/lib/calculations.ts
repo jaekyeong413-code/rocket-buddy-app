@@ -31,58 +31,69 @@ export function parseDate(dateString: string): Date {
   return new Date(dateString);
 }
 
-// 실제 배송 완료 수량 계산
+// 실제 배송 완료 수량 계산 (완료 입력값 기준)
 export function calculateActualDeliveries(record: WorkRecord): number {
-  const { allocated, cancelled, incomplete, transferred, added } = record.delivery;
-  return Math.max(0, allocated - cancelled - incomplete - transferred + added);
+  return record.delivery.completed;
 }
 
-// 실제 반품 완료 수량 계산
+// 실제 반품 완료 수량 계산 (전체 할당 - 미회수 = 완료)
 export function calculateActualReturns(record: WorkRecord): number {
-  return record.returns.completed + record.returns.numbered;
+  const allocated = record.returns.allocated || 0;
+  const notCollected = record.returns.notCollected || 0;
+  return Math.max(0, allocated - notCollected);
 }
 
-// 실제 FB 회수 수량 계산
+// 실제 FB 회수 수량 계산 (전체 할당 - 미회수 = 완료)
 export function calculateActualFreshBags(record: WorkRecord): number {
-  return record.freshBag.regular + record.freshBag.standalone;
+  const totalAllocated = (record.freshBag.regularAllocated || 0) + 
+                         (record.freshBag.standaloneAllocated || 0) +
+                         (record.freshBag.regularAdjustment || 0) -
+                         (record.freshBag.transferred || 0) +
+                         (record.freshBag.added || 0);
+  const totalFailed = (record.freshBag.failedAbsent || 0) + (record.freshBag.failedNoProduct || 0);
+  return Math.max(0, totalAllocated - totalFailed);
 }
 
-// 배송 진행률 계산
+// 배송 진행률 계산 (완료 입력값 기준)
 export function calculateDeliveryProgress(records: WorkRecord[]): { completed: number; total: number } {
   let completed = 0;
   let total = 0;
   
   for (const record of records) {
-    total += record.delivery.allocated - record.delivery.transferred + record.delivery.added;
-    completed += calculateActualDeliveries(record);
+    total += record.delivery.allocated - record.delivery.transferred + record.delivery.added + (record.delivery.firstRoundRemaining || 0);
+    completed += record.delivery.completed;
   }
   
   return { completed, total: Math.max(total, completed) };
 }
 
-// 반품 진행률 계산
+// 반품 진행률 계산 (전체 할당 - 미회수 = 완료)
 export function calculateReturnsProgress(records: WorkRecord[]): { completed: number; total: number } {
   let completed = 0;
   let total = 0;
   
   for (const record of records) {
-    total += record.returns.allocated || 0;
-    completed += record.returns.completed + record.returns.numbered;
+    const allocated = record.returns.allocated || 0;
+    const notCollected = record.returns.notCollected || 0;
+    total += allocated;
+    completed += Math.max(0, allocated - notCollected);
   }
   
   return { completed, total: Math.max(total, completed) };
 }
 
-// FB 진행률 계산
+// FB 진행률 계산 (전체 할당 - 미회수 = 완료)
 export function calculateFBProgress(records: WorkRecord[]): { completed: number; total: number } {
   let completed = 0;
   let total = 0;
   
   for (const record of records) {
     const fbAllocated = (record.freshBag.regularAllocated || 0) + (record.freshBag.standaloneAllocated || 0) 
+                        + (record.freshBag.regularAdjustment || 0)
                         - (record.freshBag.transferred || 0) + (record.freshBag.added || 0);
+    const totalFailed = (record.freshBag.failedAbsent || 0) + (record.freshBag.failedNoProduct || 0);
     total += fbAllocated;
-    completed += record.freshBag.regular + record.freshBag.standalone;
+    completed += Math.max(0, fbAllocated - totalFailed);
   }
   
   return { completed, total: Math.max(total, completed) };
@@ -94,12 +105,10 @@ export function calculateTodayRegularFBRate(records: WorkRecord[]): number {
   let total = 0;
 
   for (const record of records) {
-    collected += record.freshBag.regular;
-    total += record.freshBag.regular +
-             (record.freshBag.failedAbsent || 0) +
-             (record.freshBag.failedNoProduct || 0) +
-             (record.freshBag.failedNotOut || 0) +
-             (record.freshBag.failedWithProducts || 0);
+    const regularAllocated = (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0);
+    const regularFailed = (record.freshBag.failedAbsent || 0) + (record.freshBag.failedNoProduct || 0);
+    collected += Math.max(0, regularAllocated - regularFailed);
+    total += regularAllocated;
   }
 
   if (total === 0) return 0;
@@ -112,8 +121,9 @@ export function calculateTodayStandaloneFBRate(records: WorkRecord[]): number {
   let total = 0;
 
   for (const record of records) {
-    collected += record.freshBag.standalone;
-    total += record.freshBag.standalone;
+    const standaloneAllocated = (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0);
+    total += Math.max(0, standaloneAllocated);
+    collected += Math.max(0, standaloneAllocated); // 단독은 미회수 사유가 별도로 없음
   }
 
   if (total === 0) return 0;
@@ -130,16 +140,23 @@ export function calculateDailyIncome(
   for (const record of records) {
     const routeRate = settings.routes[record.route];
 
-    // Delivery income - 실제 배송 완료 수량 기준
+    // Delivery income - 완료 수량 기준
     const actualDeliveries = calculateActualDeliveries(record);
     total += actualDeliveries * routeRate;
 
-    // Returns income
+    // Returns income - 할당 - 미회수 = 완료
     total += calculateActualReturns(record) * routeRate;
 
-    // Fresh bag income
-    total += record.freshBag.regular * settings.freshBag.regular;
-    total += record.freshBag.standalone * settings.freshBag.standalone;
+    // Fresh bag income - 할당 - 미회수 = 완료
+    const fbCompleted = calculateActualFreshBags(record);
+    // 일반과 단독 비율로 분배
+    const regularRatio = (record.freshBag.regularAllocated || 0) / 
+      ((record.freshBag.regularAllocated || 0) + (record.freshBag.standaloneAllocated || 0) || 1);
+    const regularCompleted = Math.round(fbCompleted * regularRatio);
+    const standaloneCompleted = fbCompleted - regularCompleted;
+    
+    total += regularCompleted * settings.freshBag.regular;
+    total += standaloneCompleted * settings.freshBag.standalone;
   }
 
   return total;
@@ -152,14 +169,19 @@ export function calculateDailyIncomeDetails(
 ): {
   routeIncomes: { route: string; income: number; count: number }[];
   returnsIncome: number;
+  returnsCount: number;
   fbIncome: { regular: number; standalone: number };
+  fbCount: { regular: number; standalone: number };
   fbIncentive: { regular: number; standalone: number };
   totalIncome: number;
 } {
   const routeIncomes: { [key: string]: { income: number; count: number } } = {};
   let returnsIncome = 0;
+  let returnsCount = 0;
   let regularFBIncome = 0;
   let standaloneFBIncome = 0;
+  let regularFBCount = 0;
+  let standaloneFBCount = 0;
 
   for (const record of records) {
     const routeRate = settings.routes[record.route];
@@ -171,9 +193,21 @@ export function calculateDailyIncomeDetails(
     routeIncomes[record.route].income += actualDeliveries * routeRate;
     routeIncomes[record.route].count += actualDeliveries;
 
-    returnsIncome += calculateActualReturns(record) * routeRate;
-    regularFBIncome += record.freshBag.regular * settings.freshBag.regular;
-    standaloneFBIncome += record.freshBag.standalone * settings.freshBag.standalone;
+    const actualReturns = calculateActualReturns(record);
+    returnsIncome += actualReturns * routeRate;
+    returnsCount += actualReturns;
+
+    // FB 수입 계산
+    const fbCompleted = calculateActualFreshBags(record);
+    const regularRatio = (record.freshBag.regularAllocated || 0) / 
+      ((record.freshBag.regularAllocated || 0) + (record.freshBag.standaloneAllocated || 0) || 1);
+    const regularCompleted = Math.round(fbCompleted * regularRatio);
+    const standaloneCompleted = fbCompleted - regularCompleted;
+    
+    regularFBIncome += regularCompleted * settings.freshBag.regular;
+    standaloneFBIncome += standaloneCompleted * settings.freshBag.standalone;
+    regularFBCount += regularCompleted;
+    standaloneFBCount += standaloneCompleted;
   }
 
   // 오늘 FB 인센티브 계산
@@ -196,7 +230,9 @@ export function calculateDailyIncomeDetails(
       count: data.count,
     })),
     returnsIncome,
+    returnsCount,
     fbIncome: { regular: regularFBIncome, standalone: standaloneFBIncome },
+    fbCount: { regular: regularFBCount, standalone: standaloneFBCount },
     fbIncentive: { regular: regularIncentive, standalone: standaloneIncentive },
     totalIncome,
   };
@@ -211,15 +247,14 @@ export function calculateFBCollectionRate(
 
   for (const record of records) {
     if (type === 'regular') {
-      collected += record.freshBag.regular;
-      total += record.freshBag.regular +
-               (record.freshBag.failedAbsent || 0) +
-               (record.freshBag.failedNoProduct || 0) +
-               (record.freshBag.failedNotOut || 0) +
-               (record.freshBag.failedWithProducts || 0);
+      const regularAllocated = (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0);
+      const regularFailed = (record.freshBag.failedAbsent || 0) + (record.freshBag.failedNoProduct || 0);
+      total += regularAllocated;
+      collected += Math.max(0, regularAllocated - regularFailed);
     } else {
-      collected += record.freshBag.standalone;
-      total += record.freshBag.standalone;
+      const standaloneAllocated = Math.max(0, (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0));
+      total += standaloneAllocated;
+      collected += standaloneAllocated;
     }
   }
 
@@ -248,12 +283,19 @@ export function calculatePeriodSummary(
     const actualDeliveries = calculateActualDeliveries(record);
     totalDeliveries += actualDeliveries;
     totalReturns += calculateActualReturns(record);
-    totalFreshBags += record.freshBag.regular + record.freshBag.standalone;
+    totalFreshBags += calculateActualFreshBags(record);
 
     totalIncome += actualDeliveries * routeRate;
     totalIncome += calculateActualReturns(record) * routeRate;
-    totalIncome += record.freshBag.regular * settings.freshBag.regular;
-    totalIncome += record.freshBag.standalone * settings.freshBag.standalone;
+    
+    const fbCompleted = calculateActualFreshBags(record);
+    const regularRatio = (record.freshBag.regularAllocated || 0) / 
+      ((record.freshBag.regularAllocated || 0) + (record.freshBag.standaloneAllocated || 0) || 1);
+    const regularCompleted = Math.round(fbCompleted * regularRatio);
+    const standaloneCompleted = fbCompleted - regularCompleted;
+    
+    totalIncome += regularCompleted * settings.freshBag.regular;
+    totalIncome += standaloneCompleted * settings.freshBag.standalone;
   }
 
   const regularFBRate = calculateFBCollectionRate(periodRecords, 'regular');
@@ -365,6 +407,7 @@ export function createDefaultDeliveryData(): DeliveryData {
     incomplete: 0,
     transferred: 0,
     added: 0,
+    firstRoundRemaining: 0,
   };
 }
 

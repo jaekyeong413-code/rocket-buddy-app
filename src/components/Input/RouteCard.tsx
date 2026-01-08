@@ -85,18 +85,15 @@ interface RouteCardProps {
 export function RouteCard({ route, data, onChange, unitPrice }: RouteCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // 실제 배송 완료 수량 계산
-  const actualCompleted = Math.max(
-    0,
-    data.allocated - data.cancelled - data.incomplete - data.transferred + data.added
-  );
-
-  // 예상 수익 계산
-  const estimatedIncome = actualCompleted * unitPrice;
+  // 배송 완료 수량 기준 예상 수익 계산
+  const estimatedIncome = data.completed * unitPrice;
 
   const updateField = (field: keyof DeliveryData, value: number) => {
     onChange({ ...data, [field]: value });
   };
+
+  // 현재 총 할당 (1차 할당 + 1회전 잔여 + 추가 - 이관)
+  const currentTotalAllocation = data.allocated + (data.firstRoundRemaining || 0) + data.added - data.transferred;
 
   return (
     <div className="bg-card rounded-2xl shadow-card border border-border/30 overflow-hidden">
@@ -130,20 +127,57 @@ export function RouteCard({ route, data, onChange, unitPrice }: RouteCardProps) 
       {/* 상세 입력 필드 */}
       {isExpanded && (
         <div className="p-4 space-y-2">
+          {/* 현재 총 할당 */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-accent/30 border border-primary/20 mb-3">
+            <span className="text-sm font-medium text-primary">현재 총 할당</span>
+            <span className="text-lg font-bold text-primary">{currentTotalAllocation}</span>
+          </div>
+
           {/* 할당 수량 */}
           <NumberField
-            label="할당"
+            label="1차 할당"
             value={data.allocated}
             onChange={(v) => updateField('allocated', v)}
           />
 
-          {/* 실제 완료 (자동 계산, 표시용) */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-success/10 border-2 border-success/20">
-            <div className="flex items-center gap-2">
-              <Award className="w-4 h-4 text-success" />
-              <span className="text-sm font-semibold text-success">실제 완료</span>
+          {/* 1회전 잔여 (있을 경우만 표시) */}
+          {(data.firstRoundRemaining || 0) > 0 && (
+            <div className="flex items-center justify-between p-3 rounded-xl bg-warning/10">
+              <span className="text-sm font-medium text-warning">1회전 잔여</span>
+              <span className="text-lg font-bold text-warning">{data.firstRoundRemaining}</span>
             </div>
-            <span className="text-xl font-bold text-success">{actualCompleted}</span>
+          )}
+
+          {/* 완료 입력 (핵심 입력) */}
+          <div className="flex items-center justify-between p-4 rounded-xl bg-success/10 border-2 border-success/30">
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-success" />
+              <span className="text-base font-semibold text-success">완료</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => updateField('completed', Math.max(0, data.completed - 1))}
+                className="w-10 h-10 rounded-full bg-background flex items-center justify-center hover:bg-muted transition-colors"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={data.completed || ''}
+                onChange={(e) => updateField('completed', parseInt(e.target.value.replace(/\D/g, '')) || 0)}
+                className="w-20 h-10 text-center text-xl font-bold bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-success/50 text-success"
+              />
+              <button
+                type="button"
+                onClick={() => updateField('completed', data.completed + 1)}
+                className="w-10 h-10 rounded-full bg-success text-success-foreground flex items-center justify-center hover:bg-success/90 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* 차감 항목들 */}

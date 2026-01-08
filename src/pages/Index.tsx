@@ -3,7 +3,9 @@ import { Header } from '@/components/Layout/Header';
 import { BottomNavigation } from '@/components/Navigation/BottomNavigation';
 import {
   IncomeCard,
-  CollectionRateGauge,
+  TodayIncomeCard,
+  TodayFBStatus,
+  TodayProgress,
   TodayStats,
 } from '@/components/Dashboard/DashboardCards';
 import { WorkInputForm } from '@/components/Input/WorkInputForm';
@@ -18,7 +20,6 @@ const Index = () => {
   const { toast } = useToast();
 
   const handleRecordEdit = (record: WorkRecord) => {
-    // For now, show a toast - full edit modal can be added later
     toast({
       title: '수정 기능',
       description: '기록 삭제 후 다시 입력해주세요.',
@@ -42,7 +43,9 @@ const Index = () => {
           {activeTab === 'dashboard' && (
             <div className="space-y-5">
               <IncomeCard />
-              <CollectionRateGauge />
+              <TodayIncomeCard />
+              <TodayProgress />
+              <TodayFBStatus />
               <TodayStats />
             </div>
           )}

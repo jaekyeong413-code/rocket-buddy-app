@@ -23,12 +23,13 @@ export interface DeliveryData {
   incomplete: number;
   transferred: number; // 이관(-)
   added: number; // 추가(+)
+  firstRoundRemaining: number; // 1회전 잔여
 }
 
 export interface ReturnsData {
   allocated: number;
   completed: number;
-  notCollected: number;
+  notCollected: number; // 미회수 수량 (숫자만)
   numbered: number;
   incomplete: number;
 }
@@ -54,6 +55,20 @@ export interface WorkRecord {
   route: '203D' | '206A';
   round: 1 | 2;
   delivery: DeliveryData;
+  returns: ReturnsData;
+  freshBag: FreshBagData;
+}
+
+// 오늘의 작업 데이터 (저장 전 상태 - 항상 표시)
+export interface TodayWorkData {
+  date: string;
+  firstAllocationDelivery: number; // 1차 할당 배송
+  firstAllocationReturns: number; // 1차 할당 반품
+  totalRemainingAfterFirstRound: number; // 1회전 잔여 포함 전체 남은 물량
+  routes: {
+    '203D': DeliveryData;
+    '206A': DeliveryData;
+  };
   returns: ReturnsData;
   freshBag: FreshBagData;
 }
