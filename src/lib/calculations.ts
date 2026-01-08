@@ -91,7 +91,10 @@ export function calculateFBProgress(records: WorkRecord[]): { completed: number;
     const fbAllocated = (record.freshBag.regularAllocated || 0) + (record.freshBag.standaloneAllocated || 0) 
                         + (record.freshBag.regularAdjustment || 0)
                         - (record.freshBag.transferred || 0) + (record.freshBag.added || 0);
-    const totalFailed = (record.freshBag.failedAbsent || 0) + (record.freshBag.failedNoProduct || 0);
+const totalFailed =
+  (record.freshBag.failedAbsent || 0) +
+  (record.freshBag.failedNoProduct || 0) +
+  (record.freshBag.failedWithProducts || 0);
     total += fbAllocated;
     completed += Math.max(0, fbAllocated - totalFailed);
   }
