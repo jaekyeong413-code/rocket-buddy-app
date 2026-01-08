@@ -35,17 +35,20 @@ export interface ReturnsData {
 }
 
 export interface FreshBagData {
-  regularAllocated: number; // 일반 할당
-  standaloneAllocated: number; // 단독 할당
-  regularAdjustment: number; // 일반 증감 (+/-)
-  transferred: number; // 이관(-)
-  added: number; // 추가(+)
-  regular: number; // 일반 회수 완료
-  standalone: number; // 단독 회수 완료
-  failedAbsent: number; // 미회수 - 부재
-  failedNoProduct: number; // 미회수 - 상품 없음
-  failedNotOut: number; // 기존 호환용
-  failedWithProducts: number; // 기존 호환용
+  // 할당
+  regularAllocated: number;
+  standaloneAllocated: number;
+
+  // 조정
+  regularAdjustment: number; // 단독 → 일반 전환
+  transferred: number;       // 이관(-)
+  added: number;             // 추가(+)
+
+  // 미회수 (회수율 인정, 단가 미지급)
+  failedAbsent: number;        // 부재
+  failedNoProduct: number;     // 프레시백 없음
+  failedWithProducts: number;  // 프레시백 내 상품 남아 있음
+
   incomplete: number;
 }
 
