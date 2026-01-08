@@ -131,7 +131,7 @@ export function FreshBagCard({ data, onChange, regularRate, standaloneRate }: Fr
                          - (data.transferred || 0) + (data.added || 0);
   
   // 총 미회수 수량
-  const totalFailed = (data.failedAbsent || 0) + (data.failedNoProduct || 0);
+const totalFailed = (data.failedAbsent || 0) + (data.failedWithProducts || 0);
 
   // 완료 수량 (할당 - 미회수 = 완료)
   const totalCompleted = Math.max(0, totalAllocated - totalFailed);
@@ -231,17 +231,23 @@ export function FreshBagCard({ data, onChange, regularRate, standaloneRate }: Fr
                 onIncrement={() => updateField('failedAbsent', (data.failedAbsent || 0) + 1)}
                 onDecrement={() => updateField('failedAbsent', Math.max(0, (data.failedAbsent || 0) - 1))}
               />
-              <FailedButton
-                label="상품 없음"
-                icon={<PackageX className="w-4 h-4 text-destructive" />}
-                value={data.failedNoProduct || 0}
-                onIncrement={() => updateField('failedNoProduct', (data.failedNoProduct || 0) + 1)}
-                onDecrement={() => updateField('failedNoProduct', Math.max(0, (data.failedNoProduct || 0) - 1))}
-              />
+<FailedButton
+  label="상품 남아 있음"
+  icon={<PackageX className="w-4 h-4 text-destructive" />}
+  value={data.failedWithProducts || 0}
+  onIncrement={() =>
+    updateField('failedWithProducts', (data.failedWithProducts || 0) + 1)
+  }
+  onDecrement={() =>
+    updateField(
+      'failedWithProducts',
+      Math.max(0, (data.failedWithProducts || 0) - 1)
+    )
+  }
+/>
             </div>
             {totalFailed > 0 && (
-              <div className="text-xs text-center text-muted-foreground">
-                총 미회수: {totalFailed}건 (부재 {data.failedAbsent || 0}, 상품 없음 {data.failedNoProduct || 0})
+              <div className="text-xs text-center text-muted-foreground">총 미회수: {totalFailed}건 (부재 {data.failedAbsent || 0}, 상품 남아 있음 {data.failedWithProducts || 0})
               </div>
             )}
           </div>
