@@ -114,16 +114,32 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     }
   };
 
-  // 라우트별 할당 수정 시 전체 합계는 고정 (요청에 따라)
+  // 라우트별 할당 수정 시 총량 불변: 한쪽 변경 → 다른쪽 자동 보정
   const handleDelivery203DChange = useCallback((data: DeliveryData) => {
+    const round1Total = parseInt(firstAllocationDelivery) || 0;
+    const newAllocated203D = data.allocated;
+    
+    // 할당량이 변경되었으면 206A를 자동 보정
+    if (newAllocated203D !== delivery203D.allocated && round1Total > 0) {
+      const new206AAllocated = Math.max(0, round1Total - newAllocated203D);
+      setDelivery206A(prev => ({ ...prev, allocated: new206AAllocated }));
+    }
+    
     setDelivery203D(data);
-    // 하위 라우트 수정 시 상단 전체 합계 고정 유지
-  }, []);
+  }, [firstAllocationDelivery, delivery203D.allocated]);
 
   const handleDelivery206AChange = useCallback((data: DeliveryData) => {
+    const round1Total = parseInt(firstAllocationDelivery) || 0;
+    const newAllocated206A = data.allocated;
+    
+    // 할당량이 변경되었으면 203D를 자동 보정
+    if (newAllocated206A !== delivery206A.allocated && round1Total > 0) {
+      const new203DAllocated = Math.max(0, round1Total - newAllocated206A);
+      setDelivery203D(prev => ({ ...prev, allocated: new203DAllocated }));
+    }
+    
     setDelivery206A(data);
-    // 하위 라우트 수정 시 상단 전체 합계 고정 유지
-  }, []);
+  }, [firstAllocationDelivery, delivery206A.allocated]);
 
   // 1차 할당 반품 입력 시 반품 할당에 반영
   const handleFirstAllocationReturnsChange = (value: string) => {
@@ -132,9 +148,10 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     setReturns(prev => ({ ...prev, allocated: total }));
   };
 
-  // 현재 총 할당량 계산
-  const currentTotalAllocation = (delivery203D.allocated + delivery206A.allocated + 
-    (delivery203D.firstRoundRemaining || 0) + (delivery206A.firstRoundRemaining || 0));
+  // 오늘 총 물량 = 1차 할당 + 1회전 잔여분 (원본 기준값 사용, 배분 조정 영향 없음)
+  const round1Total = parseInt(firstAllocationDelivery) || 0;
+  const firstRoundRemainingTotal = (delivery203D.firstRoundRemaining || 0) + (delivery206A.firstRoundRemaining || 0);
+  const todayTotalDelivery = round1Total + firstRoundRemainingTotal;
 
   // 오늘 예상 수입 실시간 계산
   const todayRecords = records.filter(r => r.date === date);
@@ -363,10 +380,10 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
           )}
         </div>
 
-        {/* 현재 총 할당량 표시 */}
+        {/* 오늘 총 물량 표시 (배분 조정으로 변하지 않음) */}
         <div className="flex items-center justify-between p-3 bg-success/10 rounded-xl">
-          <span className="text-sm font-medium text-success">현재 총 할당량</span>
-          <span className="text-xl font-bold text-success">{currentTotalAllocation}</span>
+          <span className="text-sm font-medium text-success">오늘 총 물량</span>
+          <span className="text-xl font-bold text-success">{todayTotalDelivery}</span>
         </div>
 
         {/* 라우트별 분배 */}
