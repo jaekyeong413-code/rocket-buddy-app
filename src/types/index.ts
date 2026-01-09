@@ -124,3 +124,8 @@ export interface WeeklyStats {
 export type RouteType = '203D' | '206A';
 export type RoundType = 1 | 2;
 export type FilterType = 'daily' | 'weekly' | 'monthly';
+// FreshBag 미회수 사유 타입
+export type FreshBagFailedReason =
+  | 'failedAbsent'
+  | 'failedNoProduct'
+  | 'failedWithProducts';
