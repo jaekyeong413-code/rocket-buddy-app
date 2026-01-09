@@ -34,11 +34,16 @@ function RecordItem({ record, onEdit, onDelete, routeRate, fbRates }: RecordItem
   const [showDelete, setShowDelete] = useState(false);
   
   const actualDeliveries = calculateActualDeliveries(record);
+  
+  // FB 완료 수량 계산 (할당 - 미회수)
+  const regularCompleted = Math.max(0, (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0) - (record.freshBag.failedAbsent || 0) - (record.freshBag.failedNoProduct || 0));
+  const standaloneCompleted = Math.max(0, (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0));
+  
   const income =
     actualDeliveries * routeRate +
     (record.returns.completed + record.returns.numbered) * routeRate +
-    record.freshBag.regular * fbRates.regular +
-    record.freshBag.standalone * fbRates.standalone;
+    regularCompleted * fbRates.regular +
+    standaloneCompleted * fbRates.standalone;
 
   return (
     <>
@@ -106,7 +111,7 @@ function RecordItem({ record, onEdit, onDelete, routeRate, fbRates }: RecordItem
               <span className="text-xs">FB</span>
             </div>
             <div className="text-lg font-bold">
-              {record.freshBag.regular + record.freshBag.standalone}
+              {(record.freshBag.regularAllocated || 0) + (record.freshBag.standaloneAllocated || 0)}
             </div>
           </div>
         </div>
@@ -200,11 +205,13 @@ export function RecordsList({ onEdit }: { onEdit: (record: WorkRecord) => void }
   const exportToExcel = () => {
     const data = filteredRecords.map(record => {
       const actualDeliveries = calculateActualDeliveries(record);
+      const regularCompleted = Math.max(0, (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0) - (record.freshBag.failedAbsent || 0) - (record.freshBag.failedNoProduct || 0));
+      const standaloneCompleted = Math.max(0, (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0));
       const income =
         actualDeliveries * settings.routes[record.route] +
         (record.returns.completed + record.returns.numbered) * settings.routes[record.route] +
-        record.freshBag.regular * settings.freshBag.regular +
-        record.freshBag.standalone * settings.freshBag.standalone;
+        regularCompleted * settings.freshBag.regular +
+        standaloneCompleted * settings.freshBag.standalone;
 
       return {
         '날짜': record.date,
@@ -218,8 +225,8 @@ export function RecordsList({ onEdit }: { onEdit: (record: WorkRecord) => void }
         '실제완료': actualDeliveries,
         '반품완료': record.returns.completed,
         '반품채번': record.returns.numbered,
-        'FB일반': record.freshBag.regular,
-        'FB단독': record.freshBag.standalone,
+        'FB일반할당': record.freshBag.regularAllocated || 0,
+        'FB단독할당': record.freshBag.standaloneAllocated || 0,
         'FB미회수_부재': record.freshBag.failedAbsent || 0,
         'FB미회수_상품없음': record.freshBag.failedNoProduct || 0,
         '예상수입': income,

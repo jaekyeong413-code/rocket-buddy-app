@@ -433,11 +433,8 @@ export function createDefaultFreshBagData(): FreshBagData {
     regularAdjustment: 0,
     transferred: 0,
     added: 0,
-    regular: 0,
-    standalone: 0,
     failedAbsent: 0,
     failedNoProduct: 0,
-    failedNotOut: 0,
     failedWithProducts: 0,
     incomplete: 0,
   };
