@@ -11,10 +11,12 @@ import {
   calculateDeliveryProgress,
   calculateReturnsProgress,
   calculateFBProgress,
-  calculateTodayRegularFBRate,
-  calculateTodayStandaloneFBRate,
+  formatDate,
+  createDefaultReturnsData,
+  createDefaultFreshBagData,
 } from '@/lib/calculations';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { WorkRecord } from '@/types';
 
 export function IncomeCard() {
   const { settings, records } = useStore();
@@ -64,12 +66,51 @@ export function IncomeCard() {
 }
 
 export function TodayIncomeCard() {
-  const { settings, records } = useStore();
-  const todayRecords = getTodayRecords(records);
+  const { settings, records, getTodayWorkData } = useStore();
   const [showDetails, setShowDetails] = useState(false);
   
-  const todayIncome = calculateDailyIncome(todayRecords, settings);
-  const details = calculateDailyIncomeDetails(todayRecords, settings);
+  // 저장된 오늘 기록
+  const savedTodayRecords = getTodayRecords(records);
+  
+  // 현재 입력 중인 오늘 데이터 (store에서 실시간 조회)
+  const todayWorkData = getTodayWorkData();
+  const today = formatDate(new Date());
+  
+  // 현재 입력 중인 데이터를 임시 레코드로 변환
+  const currentInputAsRecords: WorkRecord[] = [];
+  const delivery203D = todayWorkData.routes['203D'];
+  const delivery206A = todayWorkData.routes['206A'];
+  const freshBag = todayWorkData.freshBag;
+  const returns = todayWorkData.returns;
+  
+  if (delivery203D.allocated > 0 || delivery203D.completed > 0) {
+    currentInputAsRecords.push({
+      id: 'temp-203d',
+      date: today,
+      route: '203D',
+      round: 1,
+      delivery: delivery203D,
+      returns,
+      freshBag,
+    });
+  }
+  
+  if (delivery206A.allocated > 0 || delivery206A.completed > 0) {
+    currentInputAsRecords.push({
+      id: 'temp-206a',
+      date: today,
+      route: '206A',
+      round: 1,
+      delivery: delivery206A,
+      returns: createDefaultReturnsData(),
+      freshBag: createDefaultFreshBagData(),
+    });
+  }
+
+  // 저장된 기록 + 현재 입력 중인 데이터 합산
+  const allTodayRecords = [...savedTodayRecords, ...currentInputAsRecords];
+  const todayIncome = calculateDailyIncome(allTodayRecords, settings);
+  const details = calculateDailyIncomeDetails(allTodayRecords, settings);
 
   return (
     <>
@@ -179,16 +220,29 @@ export function TodayIncomeCard() {
 }
 
 export function TodayFBStatus() {
-  const { settings, records } = useStore();
-  const todayRecords = getTodayRecords(records);
+  const { settings, records, getTodayWorkData } = useStore();
+  const savedTodayRecords = getTodayRecords(records);
+  const todayWorkData = getTodayWorkData();
+  const today = formatDate(new Date());
   
-  const regularRate = calculateTodayRegularFBRate(todayRecords);
-  const standaloneRate = calculateTodayStandaloneFBRate(todayRecords);
+  // 현재 입력 중인 프레시백 데이터
+  const freshBag = todayWorkData.freshBag;
+  
+  // 진행률용 회수율 (전체 기준)
+  const totalAllocated = (freshBag.regularAllocated || 0) + (freshBag.standaloneAllocated || 0) 
+                         + (freshBag.regularAdjustment || 0) 
+                         - (freshBag.transferred || 0) + (freshBag.added || 0);
+  const totalFailed = (freshBag.failedAbsent || 0) + (freshBag.failedWithProducts || 0);
+  const progressRate = totalAllocated > 0 ? ((totalAllocated - totalFailed) / totalAllocated) * 100 : 0;
+  
+  // 평가용 단독 회수율
+  const standaloneAllocated = Math.max(0, (freshBag.standaloneAllocated || 0) - (freshBag.regularAdjustment || 0));
+  const standaloneRate = standaloneAllocated > 0 ? 100 : 0; // 단독은 별도 미회수 없음
   
   const regularTarget = settings.incentive.regularThreshold;
   const standaloneTarget = settings.incentive.standaloneThreshold;
   
-  const regularAchieved = regularRate >= regularTarget;
+  const regularAchieved = progressRate >= regularTarget;
   const standaloneAchieved = standaloneRate >= standaloneTarget;
 
   return (
@@ -199,10 +253,11 @@ export function TodayFBStatus() {
       </h3>
       
       <div className="space-y-4">
+        {/* 진행률용 회수율 (전체) */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">일반(연계)</span>
+              <span className="text-sm font-medium">진행률 (전체)</span>
               {regularAchieved && (
                 <span className="flex items-center gap-1 px-2 py-0.5 bg-success/10 text-success text-xs rounded-full font-medium animate-pulse">
                   <Award className="w-3 h-3" />
@@ -211,7 +266,7 @@ export function TodayFBStatus() {
               )}
             </div>
             <span className={`text-sm font-bold ${regularAchieved ? 'text-success' : 'text-foreground'}`}>
-              {formatPercent(regularRate)}
+              {formatPercent(progressRate)}
             </span>
           </div>
           <div className="relative h-4 bg-muted rounded-full overflow-hidden">
@@ -219,7 +274,7 @@ export function TodayFBStatus() {
               className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
                 regularAchieved ? 'bg-gradient-success' : 'bg-primary'
               }`}
-              style={{ width: `${Math.min(100, regularRate)}%` }}
+              style={{ width: `${Math.min(100, progressRate)}%` }}
             />
             <div
               className="absolute inset-y-0 w-0.5 bg-destructive"
@@ -234,10 +289,11 @@ export function TodayFBStatus() {
           </div>
         </div>
 
+        {/* 평가용 단독 회수율 */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">단독</span>
+              <span className="text-sm font-medium">단독 (평가용)</span>
               {standaloneAchieved && (
                 <span className="flex items-center gap-1 px-2 py-0.5 bg-success/10 text-success text-xs rounded-full font-medium animate-pulse">
                   <Award className="w-3 h-3" />
@@ -269,6 +325,15 @@ export function TodayFBStatus() {
           </div>
         </div>
       </div>
+      
+      {/* 미회수 사유 표시 */}
+      {totalFailed > 0 && (
+        <div className="mt-4 p-3 bg-destructive/10 rounded-xl">
+          <div className="text-xs text-destructive font-medium">
+            확인 완료 (단가 미지급): 부재 {freshBag.failedAbsent || 0}건, 상품 남아 있음 {freshBag.failedWithProducts || 0}건
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -300,12 +365,45 @@ function ProgressBar({ label, completed, total, color }: {
 }
 
 export function TodayProgress() {
-  const { records } = useStore();
-  const todayRecords = getTodayRecords(records);
+  const { records, getTodayWorkData } = useStore();
+  const savedTodayRecords = getTodayRecords(records);
+  const todayWorkData = getTodayWorkData();
+  const today = formatDate(new Date());
   
-  const deliveryProgress = calculateDeliveryProgress(todayRecords);
-  const returnsProgress = calculateReturnsProgress(todayRecords);
-  const fbProgress = calculateFBProgress(todayRecords);
+  // 현재 입력 중인 데이터를 임시 레코드로 변환
+  const currentInputAsRecords: WorkRecord[] = [];
+  const delivery203D = todayWorkData.routes['203D'];
+  const delivery206A = todayWorkData.routes['206A'];
+  
+  if (delivery203D.allocated > 0 || delivery203D.completed > 0) {
+    currentInputAsRecords.push({
+      id: 'temp-203d',
+      date: today,
+      route: '203D',
+      round: 1,
+      delivery: delivery203D,
+      returns: todayWorkData.returns,
+      freshBag: todayWorkData.freshBag,
+    });
+  }
+  
+  if (delivery206A.allocated > 0 || delivery206A.completed > 0) {
+    currentInputAsRecords.push({
+      id: 'temp-206a',
+      date: today,
+      route: '206A',
+      round: 1,
+      delivery: delivery206A,
+      returns: createDefaultReturnsData(),
+      freshBag: createDefaultFreshBagData(),
+    });
+  }
+
+  const allTodayRecords = [...savedTodayRecords, ...currentInputAsRecords];
+  
+  const deliveryProgress = calculateDeliveryProgress(allTodayRecords);
+  const returnsProgress = calculateReturnsProgress(allTodayRecords);
+  const fbProgress = calculateFBProgress(allTodayRecords);
 
   return (
     <div className="bg-card rounded-2xl p-5 shadow-card border border-border/30 animate-slide-up">
@@ -339,12 +437,45 @@ export function TodayProgress() {
 }
 
 export function TodayStats() {
-  const { records } = useStore();
-  const todayRecords = getTodayRecords(records);
+  const { records, getTodayWorkData } = useStore();
+  const savedTodayRecords = getTodayRecords(records);
+  const todayWorkData = getTodayWorkData();
+  const today = formatDate(new Date());
 
-  const deliveryProgress = calculateDeliveryProgress(todayRecords);
-  const returnsProgress = calculateReturnsProgress(todayRecords);
-  const fbProgress = calculateFBProgress(todayRecords);
+  // 현재 입력 중인 데이터를 임시 레코드로 변환
+  const currentInputAsRecords: WorkRecord[] = [];
+  const delivery203D = todayWorkData.routes['203D'];
+  const delivery206A = todayWorkData.routes['206A'];
+  
+  if (delivery203D.allocated > 0 || delivery203D.completed > 0) {
+    currentInputAsRecords.push({
+      id: 'temp-203d',
+      date: today,
+      route: '203D',
+      round: 1,
+      delivery: delivery203D,
+      returns: todayWorkData.returns,
+      freshBag: todayWorkData.freshBag,
+    });
+  }
+  
+  if (delivery206A.allocated > 0 || delivery206A.completed > 0) {
+    currentInputAsRecords.push({
+      id: 'temp-206a',
+      date: today,
+      route: '206A',
+      round: 1,
+      delivery: delivery206A,
+      returns: createDefaultReturnsData(),
+      freshBag: createDefaultFreshBagData(),
+    });
+  }
+
+  const allTodayRecords = [...savedTodayRecords, ...currentInputAsRecords];
+
+  const deliveryProgress = calculateDeliveryProgress(allTodayRecords);
+  const returnsProgress = calculateReturnsProgress(allTodayRecords);
+  const fbProgress = calculateFBProgress(allTodayRecords);
 
   const items = [
     {

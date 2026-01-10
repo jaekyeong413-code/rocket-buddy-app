@@ -7,7 +7,10 @@ interface AppState {
   settings: Settings;
   records: WorkRecord[];
   allocationHistory: RouteAllocationHistory[];
-  todayWorkData: TodayWorkData | null;
+  // 날짜별 입력 데이터 저장 (탭 이동해도 유지)
+  workDataByDate: Record<string, TodayWorkData>;
+  // 현재 입력 중인 날짜
+  currentInputDate: string;
   updateSettings: (settings: Partial<Settings>) => void;
   addRecord: (record: WorkRecord) => void;
   updateRecord: (id: string, record: Partial<WorkRecord>) => void;
@@ -15,10 +18,15 @@ interface AppState {
   getRecordsByPeriod: (startDate: string, endDate: string) => WorkRecord[];
   addAllocationHistory: (history: RouteAllocationHistory) => void;
   getRouteRatio: () => { '203D': number; '206A': number };
-  // 오늘 작업 데이터 관리 (저장 후에도 유지)
-  updateTodayWorkData: (data: Partial<TodayWorkData>) => void;
+  // 작업 데이터 관리 (날짜별)
+  updateWorkData: (date: string, data: Partial<TodayWorkData>) => void;
+  getWorkData: (date: string) => TodayWorkData;
+  setCurrentInputDate: (date: string) => void;
+  getCurrentInputDate: () => string;
+  // 저장 성공 시 해당 날짜 데이터 초기화
+  clearWorkData: (date: string) => void;
+  // 오늘 입력 데이터 (대시보드용)
   getTodayWorkData: () => TodayWorkData;
-  resetTodayWorkData: () => void;
 }
 
 const defaultSettings: Settings = {
@@ -58,7 +66,8 @@ export const useStore = create<AppState>()(
       settings: defaultSettings,
       records: [],
       allocationHistory: [],
-      todayWorkData: null,
+      workDataByDate: {},
+      currentInputDate: formatDate(new Date()),
       
       updateSettings: (newSettings) =>
         set((state) => ({
@@ -91,7 +100,6 @@ export const useStore = create<AppState>()(
 
       addAllocationHistory: (history) =>
         set((state) => {
-          // 같은 날짜가 있으면 업데이트, 없으면 추가
           const existingIndex = state.allocationHistory.findIndex(
             (h) => h.date === history.date
           );
@@ -128,37 +136,57 @@ export const useStore = create<AppState>()(
         };
       },
 
-      updateTodayWorkData: (data) =>
+      // 날짜별 작업 데이터 업데이트
+      updateWorkData: (date, data) =>
         set((state) => {
-          const today = formatDate(new Date());
-          const existing = state.todayWorkData?.date === today 
-            ? state.todayWorkData 
-            : createDefaultTodayWorkData(today);
-          
+          const existing = state.workDataByDate[date] || createDefaultTodayWorkData(date);
           return {
-            todayWorkData: {
-              ...existing,
-              ...data,
-              date: today,
+            workDataByDate: {
+              ...state.workDataByDate,
+              [date]: {
+                ...existing,
+                ...data,
+                date,
+              },
             },
           };
         }),
 
+      // 날짜별 작업 데이터 조회
+      getWorkData: (date) => {
+        const state = get();
+        return state.workDataByDate[date] || createDefaultTodayWorkData(date);
+      },
+
+      // 현재 입력 날짜 설정
+      setCurrentInputDate: (date) =>
+        set(() => ({
+          currentInputDate: date,
+        })),
+
+      // 현재 입력 날짜 조회
+      getCurrentInputDate: () => {
+        return get().currentInputDate;
+      },
+
+      // 저장 성공 시 해당 날짜 데이터 초기화 + 날짜를 오늘로 변경
+      clearWorkData: (date) =>
+        set((state) => {
+          const today = formatDate(new Date());
+          const newWorkDataByDate = { ...state.workDataByDate };
+          delete newWorkDataByDate[date];
+          return {
+            workDataByDate: newWorkDataByDate,
+            currentInputDate: today,
+          };
+        }),
+
+      // 오늘 입력 데이터 조회 (대시보드 실시간 표시용)
       getTodayWorkData: () => {
         const state = get();
         const today = formatDate(new Date());
-        
-        if (state.todayWorkData?.date === today) {
-          return state.todayWorkData;
-        }
-        
-        return createDefaultTodayWorkData(today);
+        return state.workDataByDate[today] || createDefaultTodayWorkData(today);
       },
-
-      resetTodayWorkData: () =>
-        set(() => ({
-          todayWorkData: createDefaultTodayWorkData(formatDate(new Date())),
-        })),
     }),
     {
       name: 'quickflex-storage',

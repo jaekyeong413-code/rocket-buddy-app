@@ -152,11 +152,11 @@ const totalFailed = (data.failedAbsent || 0) + (data.failedWithProducts || 0);
       >
         <div className="flex items-center gap-3">
           <Package className="w-5 h-5 text-success" />
-          <span className="text-lg font-bold text-success">프레시백</span>
+          <span className="text-lg font-bold text-success">프레시백 조정/미회수</span>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div className="text-xs text-muted-foreground">완료 {totalCompleted}건</div>
+            <div className="text-xs text-muted-foreground">회수 {totalCompleted}건</div>
             <div className="text-sm font-bold text-success">
               {estimatedIncome.toLocaleString()}원
             </div>
@@ -169,26 +169,9 @@ const totalFailed = (data.failedAbsent || 0) + (data.failedWithProducts || 0);
         </div>
       </button>
 
-      {/* 상세 입력 필드 */}
+      {/* 상세 입력 필드 (2회전 이후 조정용) */}
       {isExpanded && (
         <div className="p-4 space-y-4">
-          {/* 할당 섹션 */}
-          <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-muted-foreground">할당</h4>
-            <div className="grid grid-cols-2 gap-2">
-              <NumberField
-                label="일반"
-                value={data.regularAllocated || 0}
-                onChange={(v) => updateField('regularAllocated', v)}
-              />
-              <NumberField
-                label="단독"
-                value={data.standaloneAllocated || 0}
-                onChange={(v) => updateField('standaloneAllocated', v)}
-              />
-            </div>
-          </div>
-
           {/* 증감/이관/추가 */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-muted-foreground">조정</h4>
@@ -214,15 +197,15 @@ const totalFailed = (data.failedAbsent || 0) + (data.failedWithProducts || 0);
             </div>
           </div>
 
-          {/* 완료 표시 (자동 계산) */}
+          {/* 회수 완료 표시 (자동 계산) */}
           <div className="flex items-center justify-between p-3 rounded-xl bg-success/10 border-2 border-success/20">
-            <span className="text-sm font-semibold text-success">완료 (할당 - 미회수)</span>
+            <span className="text-sm font-semibold text-success">회수 완료</span>
             <span className="text-xl font-bold text-success">{totalCompleted}</span>
           </div>
 
-          {/* 미회수 사유 버튼 */}
+          {/* 미회수 사유 (확인 완료, 단가 미지급) */}
           <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-muted-foreground">미회수 (사유별 클릭)</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground">미회수 사유 (확인 완료, 단가 미지급)</h4>
             <div className="flex gap-2">
               <FailedButton
                 label="부재"

@@ -1,155 +1,173 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Check, ChevronLeft, ChevronRight, Lightbulb, Save, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect } from 'react';
+import { Check, ChevronLeft, ChevronRight, Lightbulb, RefreshCw, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useStore } from '@/store/useStore';
-import { WorkRecord, RoundType, DeliveryData, ReturnsData, FreshBagData } from '@/types';
+import { WorkRecord, DeliveryData } from '@/types';
 import { 
   formatDate, 
-  createDefaultDeliveryData, 
   createDefaultReturnsData, 
   createDefaultFreshBagData,
   calculateDailyIncome,
   formatCurrency,
 } from '@/lib/calculations';
-import { cn } from '@/lib/utils';
 import { RouteCard } from './RouteCard';
 import { ReturnsCard } from './ReturnsCard';
 import { FreshBagCard } from './FreshBagCard';
 import { toast } from 'sonner';
 
 export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
-  const { addRecord, records, settings, getRouteRatio, addAllocationHistory, getTodayWorkData, updateTodayWorkData } = useStore();
-  const [date, setDate] = useState(formatDate(new Date()));
+  const { 
+    addRecord, 
+    records, 
+    settings, 
+    getRouteRatio, 
+    addAllocationHistory,
+    getWorkData,
+    updateWorkData,
+    getCurrentInputDate,
+    setCurrentInputDate,
+    clearWorkData,
+  } = useStore();
+  
+  // 현재 입력 날짜 (store에서 관리 - 탭 이동해도 유지)
+  const date = getCurrentInputDate();
   const ratio = getRouteRatio();
 
-  // 오늘 작업 데이터 불러오기 (저장 후에도 유지됨)
-  const todayData = getTodayWorkData();
+  // 현재 날짜의 작업 데이터 (store에서 관리 - 탭 이동해도 유지)
+  const workData = getWorkData(date);
 
-  // 1차 할당 배송
-  const [firstAllocationDelivery, setFirstAllocationDelivery] = useState<string>(
-    todayData.firstAllocationDelivery > 0 ? todayData.firstAllocationDelivery.toString() : ''
-  );
-  
-  // 1차 할당 반품
-  const [firstAllocationReturns, setFirstAllocationReturns] = useState<string>(
-    todayData.firstAllocationReturns > 0 ? todayData.firstAllocationReturns.toString() : ''
-  );
-  
-  // 1회전 잔여 포함 전체 남은 물량
-  const [totalRemainingAfterFirstRound, setTotalRemainingAfterFirstRound] = useState<string>(
-    todayData.totalRemainingAfterFirstRound > 0 ? todayData.totalRemainingAfterFirstRound.toString() : ''
-  );
+  // 편의를 위한 변수들
+  const firstAllocationDelivery = workData.firstAllocationDelivery;
+  const firstAllocationReturns = workData.firstAllocationReturns;
+  const totalRemainingAfterFirstRound = workData.totalRemainingAfterFirstRound;
+  const delivery203D = workData.routes['203D'];
+  const delivery206A = workData.routes['206A'];
+  const returns = workData.returns;
+  const freshBag = workData.freshBag;
 
-  // 라우트별 배송 데이터
-  const [delivery203D, setDelivery203D] = useState<DeliveryData>(todayData.routes['203D']);
-  const [delivery206A, setDelivery206A] = useState<DeliveryData>(todayData.routes['206A']);
+  // 날짜 변경
+  const handleDateChange = (newDate: string) => {
+    setCurrentInputDate(newDate);
+  };
 
-  const [returns, setReturns] = useState<ReturnsData>(todayData.returns);
-  const [freshBag, setFreshBag] = useState<FreshBagData>(todayData.freshBag);
-
-  // 날짜가 바뀌면 데이터 새로 불러오기
-  useEffect(() => {
-    const today = formatDate(new Date());
-    if (date === today) {
-      const data = getTodayWorkData();
-      setFirstAllocationDelivery(data.firstAllocationDelivery > 0 ? data.firstAllocationDelivery.toString() : '');
-      setFirstAllocationReturns(data.firstAllocationReturns > 0 ? data.firstAllocationReturns.toString() : '');
-      setTotalRemainingAfterFirstRound(data.totalRemainingAfterFirstRound > 0 ? data.totalRemainingAfterFirstRound.toString() : '');
-      setDelivery203D(data.routes['203D']);
-      setDelivery206A(data.routes['206A']);
-      setReturns(data.returns);
-      setFreshBag(data.freshBag);
-    }
-  }, [date, getTodayWorkData]);
-
-  // 상태 변경 시 자동 저장
-  useEffect(() => {
-    const today = formatDate(new Date());
-    if (date === today) {
-      updateTodayWorkData({
-        firstAllocationDelivery: parseInt(firstAllocationDelivery) || 0,
-        firstAllocationReturns: parseInt(firstAllocationReturns) || 0,
-        totalRemainingAfterFirstRound: parseInt(totalRemainingAfterFirstRound) || 0,
-        routes: {
-          '203D': delivery203D,
-          '206A': delivery206A,
-        },
-        returns,
-        freshBag,
-      });
-    }
-  }, [date, firstAllocationDelivery, firstAllocationReturns, totalRemainingAfterFirstRound, delivery203D, delivery206A, returns, freshBag, updateTodayWorkData]);
+  const adjustDate = (days: number) => {
+    const current = new Date(date);
+    current.setDate(current.getDate() + days);
+    handleDateChange(formatDate(current));
+  };
 
   // 1차 할당 배송 입력 시 라우트별 자동 분배
   const handleFirstAllocationDeliveryChange = (value: string) => {
-    setFirstAllocationDelivery(value);
     const total = parseInt(value) || 0;
-    if (total > 0) {
-      const suggested203D = Math.round((total * ratio['203D']) / 100);
-      const suggested206A = total - suggested203D;
-      setDelivery203D(prev => ({ ...prev, allocated: suggested203D }));
-      setDelivery206A(prev => ({ ...prev, allocated: suggested206A }));
-    }
+    const suggested203D = total > 0 ? Math.round((total * ratio['203D']) / 100) : 0;
+    const suggested206A = total > 0 ? total - suggested203D : 0;
+    
+    updateWorkData(date, {
+      firstAllocationDelivery: total,
+      routes: {
+        ...workData.routes,
+        '203D': { ...delivery203D, allocated: suggested203D },
+        '206A': { ...delivery206A, allocated: suggested206A },
+      },
+    });
   };
 
-  // 1회전 잔여 포함 전체 남은 물량 입력 시 라우트별 잔여 자동 분배
+  // 1회전 잔여 포함 전체 남은 물량 입력
   const handleTotalRemainingChange = (value: string) => {
-    setTotalRemainingAfterFirstRound(value);
     const remaining = parseInt(value) || 0;
-    const firstAlloc = parseInt(firstAllocationDelivery) || 0;
+    const firstAlloc = firstAllocationDelivery || 0;
+    
+    let remaining203D = 0;
+    let remaining206A = 0;
     
     if (remaining > 0 && remaining > firstAlloc) {
       const firstRoundRemaining = remaining - firstAlloc;
-      const remaining203D = Math.round((firstRoundRemaining * ratio['203D']) / 100);
-      const remaining206A = firstRoundRemaining - remaining203D;
-      
-      setDelivery203D(prev => ({ 
-        ...prev, 
-        firstRoundRemaining: remaining203D,
-      }));
-      setDelivery206A(prev => ({ 
-        ...prev, 
-        firstRoundRemaining: remaining206A,
-      }));
+      remaining203D = Math.round((firstRoundRemaining * ratio['203D']) / 100);
+      remaining206A = firstRoundRemaining - remaining203D;
     }
+    
+    updateWorkData(date, {
+      totalRemainingAfterFirstRound: remaining,
+      routes: {
+        ...workData.routes,
+        '203D': { ...delivery203D, firstRoundRemaining: remaining203D },
+        '206A': { ...delivery206A, firstRoundRemaining: remaining206A },
+      },
+    });
   };
 
   // 라우트별 할당 수정 시 총량 불변: 한쪽 변경 → 다른쪽 자동 보정
   const handleDelivery203DChange = useCallback((data: DeliveryData) => {
-    const round1Total = parseInt(firstAllocationDelivery) || 0;
+    const round1Total = firstAllocationDelivery || 0;
+    const currentWorkData = getWorkData(date);
     const newAllocated203D = data.allocated;
     
     // 할당량이 변경되었으면 206A를 자동 보정
-    if (newAllocated203D !== delivery203D.allocated && round1Total > 0) {
+    if (newAllocated203D !== currentWorkData.routes['203D'].allocated && round1Total > 0) {
       const new206AAllocated = Math.max(0, round1Total - newAllocated203D);
-      setDelivery206A(prev => ({ ...prev, allocated: new206AAllocated }));
+      updateWorkData(date, {
+        routes: {
+          ...currentWorkData.routes,
+          '203D': data,
+          '206A': { ...currentWorkData.routes['206A'], allocated: new206AAllocated },
+        },
+      });
+    } else {
+      updateWorkData(date, {
+        routes: {
+          ...currentWorkData.routes,
+          '203D': data,
+        },
+      });
     }
-    
-    setDelivery203D(data);
-  }, [firstAllocationDelivery, delivery203D.allocated]);
+  }, [date, firstAllocationDelivery, getWorkData, updateWorkData]);
 
   const handleDelivery206AChange = useCallback((data: DeliveryData) => {
-    const round1Total = parseInt(firstAllocationDelivery) || 0;
+    const round1Total = firstAllocationDelivery || 0;
+    const currentWorkData = getWorkData(date);
     const newAllocated206A = data.allocated;
     
     // 할당량이 변경되었으면 203D를 자동 보정
-    if (newAllocated206A !== delivery206A.allocated && round1Total > 0) {
+    if (newAllocated206A !== currentWorkData.routes['206A'].allocated && round1Total > 0) {
       const new203DAllocated = Math.max(0, round1Total - newAllocated206A);
-      setDelivery203D(prev => ({ ...prev, allocated: new203DAllocated }));
+      updateWorkData(date, {
+        routes: {
+          ...currentWorkData.routes,
+          '203D': { ...currentWorkData.routes['203D'], allocated: new203DAllocated },
+          '206A': data,
+        },
+      });
+    } else {
+      updateWorkData(date, {
+        routes: {
+          ...currentWorkData.routes,
+          '206A': data,
+        },
+      });
     }
-    
-    setDelivery206A(data);
-  }, [firstAllocationDelivery, delivery206A.allocated]);
+  }, [date, firstAllocationDelivery, getWorkData, updateWorkData]);
 
-  // 1차 할당 반품 입력 시 반품 할당에 반영
+  // 1차 할당 반품 입력
   const handleFirstAllocationReturnsChange = (value: string) => {
-    setFirstAllocationReturns(value);
     const total = parseInt(value) || 0;
-    setReturns(prev => ({ ...prev, allocated: total }));
+    updateWorkData(date, {
+      firstAllocationReturns: total,
+      returns: { ...returns, allocated: total },
+    });
   };
 
-  // 오늘 총 물량 = 1차 할당 + 1회전 잔여분 (원본 기준값 사용, 배분 조정 영향 없음)
-  const round1Total = parseInt(firstAllocationDelivery) || 0;
+  // 프레시백 변경
+  const handleFreshBagChange = useCallback((data: typeof freshBag) => {
+    updateWorkData(date, { freshBag: data });
+  }, [date, updateWorkData]);
+
+  // 반품 변경
+  const handleReturnsChange = useCallback((data: typeof returns) => {
+    updateWorkData(date, { returns: data });
+  }, [date, updateWorkData]);
+
+  // 오늘 총 물량 = 1차 할당 + 1회전 잔여분 (원본 기준값 사용)
+  const round1Total = firstAllocationDelivery || 0;
   const firstRoundRemainingTotal = (delivery203D.firstRoundRemaining || 0) + (delivery206A.firstRoundRemaining || 0);
   const todayTotalDelivery = round1Total + firstRoundRemainingTotal;
 
@@ -183,24 +201,19 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
 
   const estimatedIncome = calculateDailyIncome([...todayRecords, ...currentInputAsRecords], settings);
 
-  const adjustDate = (days: number) => {
-    const current = new Date(date);
-    current.setDate(current.getDate() + days);
-    setDate(formatDate(current));
-  };
-
   const resetToRatio = () => {
-    const total = parseInt(firstAllocationDelivery) || 0;
+    const total = firstAllocationDelivery || 0;
     if (total > 0) {
       const suggested203D = Math.round((total * ratio['203D']) / 100);
       const suggested206A = total - suggested203D;
-      setDelivery203D(prev => ({ ...prev, allocated: suggested203D }));
-      setDelivery206A(prev => ({ ...prev, allocated: suggested206A }));
+      updateWorkData(date, {
+        routes: {
+          ...workData.routes,
+          '203D': { ...delivery203D, allocated: suggested203D },
+          '206A': { ...delivery206A, allocated: suggested206A },
+        },
+      });
     }
-  };
-
-  const handleTempSave = () => {
-    toast.success('임시 저장됨');
   };
 
   const handleSubmit = () => {
@@ -244,8 +257,25 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     }
 
     toast.success('작업 기록이 저장되었습니다!');
+    
+    // 저장 성공 시 해당 날짜 입력 데이터 초기화 + 오늘 날짜로 변경
+    clearWorkData(date);
+    
     onComplete?.();
   };
+
+  // 프레시백 회수율 계산 (진행률용: 전체 기준)
+  const totalFBAllocated = (freshBag.regularAllocated || 0) + (freshBag.standaloneAllocated || 0) 
+                           + (freshBag.regularAdjustment || 0) 
+                           - (freshBag.transferred || 0) + (freshBag.added || 0);
+  const totalFBFailed = (freshBag.failedAbsent || 0) + (freshBag.failedWithProducts || 0);
+  const progressFBRate = totalFBAllocated > 0 
+    ? ((totalFBAllocated - totalFBFailed) / totalFBAllocated * 100).toFixed(1) 
+    : '0.0';
+  
+  // 단독 회수율 (평가용: 단독 기준)
+  const standaloneAllocated = Math.max(0, (freshBag.standaloneAllocated || 0) - (freshBag.regularAdjustment || 0));
+  const standaloneFBRate = standaloneAllocated > 0 ? '100.0' : '0.0'; // 단독은 미회수 따로 집계 안함
 
   return (
     <div className="space-y-5 animate-slide-up">
@@ -273,7 +303,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
           <input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => handleDateChange(e.target.value)}
             className="text-lg font-semibold bg-transparent text-center border-none focus:outline-none"
           />
           <button
@@ -286,11 +316,11 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         </div>
       </div>
 
-      {/* 1차 할당 섹션 */}
+      {/* 1차 할당 섹션 (배송 + 반품 + 프레시백 할당) */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-border/50">
         <div className="flex items-center gap-2 mb-4">
           <Lightbulb className="w-4 h-4 text-warning" />
-          <h3 className="text-sm font-semibold text-foreground">1차 할당</h3>
+          <h3 className="text-sm font-semibold text-foreground">1차 할당 (출발 전)</h3>
           <span className="text-xs text-muted-foreground ml-auto">
             학습 비중: {ratio['203D']}% / {ratio['206A']}%
           </span>
@@ -300,22 +330,14 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-muted-foreground">
-              1차 할당 배송
+              배송 할당
             </label>
-            <button
-              type="button"
-              onClick={handleTempSave}
-              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-              title="임시 저장"
-            >
-              <Save className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
           </div>
           <input
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            value={firstAllocationDelivery}
+            value={firstAllocationDelivery || ''}
             onChange={(e) => handleFirstAllocationDeliveryChange(e.target.value.replace(/\D/g, ''))}
             placeholder="전체 배송 할당량 입력"
             className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
@@ -326,26 +348,71 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-muted-foreground">
-              1차 할당 반품
+              반품 할당
             </label>
-            <button
-              type="button"
-              onClick={handleTempSave}
-              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-              title="임시 저장"
-            >
-              <Save className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
           </div>
           <input
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            value={firstAllocationReturns}
+            value={firstAllocationReturns || ''}
             onChange={(e) => handleFirstAllocationReturnsChange(e.target.value.replace(/\D/g, ''))}
             placeholder="전체 반품 할당량 입력"
             className="w-full h-12 px-4 text-lg font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
           />
+        </div>
+
+        {/* 프레시백 할당 (1차 할당과 동일 레벨) */}
+        <div className="mb-4 p-4 bg-success/5 rounded-xl border border-success/20">
+          <div className="flex items-center gap-2 mb-3">
+            <Package className="w-4 h-4 text-success" />
+            <label className="text-xs font-semibold text-success">
+              프레시백 할당 (오늘 전량)
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">일반(연계)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={freshBag.regularAllocated || ''}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                  handleFreshBagChange({ ...freshBag, regularAllocated: val });
+                }}
+                placeholder="0"
+                className="w-full h-12 px-3 text-lg font-bold text-center bg-background rounded-xl border-2 border-success/30 focus:border-success focus:outline-none transition-colors"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">단독</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={freshBag.standaloneAllocated || ''}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                  handleFreshBagChange({ ...freshBag, standaloneAllocated: val });
+                }}
+                placeholder="0"
+                className="w-full h-12 px-3 text-lg font-bold text-center bg-background rounded-xl border-2 border-success/30 focus:border-success focus:outline-none transition-colors"
+              />
+            </div>
+          </div>
+          {/* 회수율 2층 표시 */}
+          {(freshBag.regularAllocated > 0 || freshBag.standaloneAllocated > 0) && (
+            <div className="flex justify-between mt-3 text-xs">
+              <span className="text-muted-foreground">
+                진행률: <span className="font-bold text-success">{progressFBRate}%</span>
+              </span>
+              <span className="text-muted-foreground">
+                단독 회수율: <span className="font-bold text-primary">{standaloneFBRate}%</span>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* 1회전 잔여 포함 전체 남은 물량 */}
@@ -354,20 +421,12 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             <label className="text-xs font-medium text-primary">
               1회전 잔여 포함 전체 남은 물량
             </label>
-            <button
-              type="button"
-              onClick={handleTempSave}
-              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-              title="임시 저장"
-            >
-              <Save className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
           </div>
           <input
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            value={totalRemainingAfterFirstRound}
+            value={totalRemainingAfterFirstRound || ''}
             onChange={(e) => handleTotalRemainingChange(e.target.value.replace(/\D/g, ''))}
             placeholder="1회전 후 잔여 포함 물량"
             className="w-full h-12 px-4 text-lg font-bold text-center bg-background rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
@@ -380,7 +439,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
           )}
         </div>
 
-        {/* 오늘 총 물량 표시 (배분 조정으로 변하지 않음) */}
+        {/* 오늘 총 물량 표시 */}
         <div className="flex items-center justify-between p-3 bg-success/10 rounded-xl">
           <span className="text-sm font-medium text-success">오늘 총 물량</span>
           <span className="text-xl font-bold text-success">{todayTotalDelivery}</span>
@@ -440,14 +499,14 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
       {/* Returns Card */}
       <ReturnsCard
         data={returns}
-        onChange={setReturns}
+        onChange={handleReturnsChange}
         unitPrice={settings.routes['203D']}
       />
 
-      {/* Fresh Bag Card */}
+      {/* Fresh Bag Card - 2회전 이후 조정/미회수 입력용 */}
       <FreshBagCard
         data={freshBag}
-        onChange={setFreshBag}
+        onChange={handleFreshBagChange}
         regularRate={settings.freshBag.regular}
         standaloneRate={settings.freshBag.standalone}
       />
