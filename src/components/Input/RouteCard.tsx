@@ -29,28 +29,30 @@ function NumberField({ label, value, onChange, type = 'default' }: NumberFieldPr
   };
 
   return (
-    <div className={cn('flex items-center justify-between p-3 rounded-xl', bgColors[type])}>
-      <div className="flex items-center gap-2">
-        <span className={cn('text-sm font-medium', colors[type])}>
-          {type === 'negative' && '- '}
-          {type === 'positive' && '+ '}
+    <div className={cn('flex items-center justify-between gap-2 p-2 rounded-xl min-w-0 overflow-hidden', bgColors[type])}>
+      {/* Label - shrinks if needed */}
+      <div className="flex items-center gap-1 min-w-0 flex-shrink">
+        <span className={cn('text-sm font-medium truncate', colors[type])}>
+          {type === 'negative' && '−'}
+          {type === 'positive' && '+'}
           {label}
         </span>
         <button
           type="button"
           onClick={handleTempSave}
-          className="p-1 rounded hover:bg-background/50 transition-colors"
+          className="p-1 rounded hover:bg-background/50 transition-colors flex-shrink-0"
         >
           <Save className="w-3 h-3 text-muted-foreground" />
         </button>
       </div>
-      <div className="flex items-center gap-2">
+      {/* Stepper controls - never shrink, always 44px touch targets */}
+      <div className="flex items-center gap-1 flex-shrink-0">
         <button
           type="button"
           onClick={() => onChange(Math.max(0, value - 1))}
-          className="w-8 h-8 rounded-full bg-background flex items-center justify-center hover:bg-muted transition-colors"
+          className="w-11 h-11 rounded-full bg-background flex items-center justify-center hover:bg-muted transition-colors touch-target"
         >
-          <Minus className="w-3 h-3" />
+          <Minus className="w-4 h-4" />
         </button>
         <input
           type="text"
@@ -59,16 +61,16 @@ function NumberField({ label, value, onChange, type = 'default' }: NumberFieldPr
           value={value || ''}
           onChange={(e) => onChange(parseInt(e.target.value.replace(/\D/g, '')) || 0)}
           className={cn(
-            'w-14 h-8 text-center font-bold bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50',
+            'w-12 h-11 text-center font-bold bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50',
             colors[type]
           )}
         />
         <button
           type="button"
           onClick={() => onChange(value + 1)}
-          className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
+          className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors touch-target"
         >
-          <Plus className="w-3 h-3" />
+          <Plus className="w-4 h-4" />
         </button>
       </div>
     </div>
@@ -149,16 +151,16 @@ export function RouteCard({ route, data, onChange, unitPrice }: RouteCardProps) 
           )}
 
           {/* 완료 입력 (핵심 입력) */}
-          <div className="flex items-center justify-between p-4 rounded-xl bg-success/10 border-2 border-success/30">
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-success" />
-              <span className="text-base font-semibold text-success">완료</span>
+          <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-success/10 border-2 border-success/30 min-w-0 overflow-hidden">
+            <div className="flex items-center gap-2 min-w-0 flex-shrink">
+              <Award className="w-5 h-5 text-success flex-shrink-0" />
+              <span className="text-base font-semibold text-success truncate">완료</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => updateField('completed', Math.max(0, data.completed - 1))}
-                className="w-10 h-10 rounded-full bg-background flex items-center justify-center hover:bg-muted transition-colors"
+                className="w-11 h-11 rounded-full bg-background flex items-center justify-center hover:bg-muted transition-colors touch-target"
               >
                 <Minus className="w-4 h-4" />
               </button>
@@ -168,12 +170,12 @@ export function RouteCard({ route, data, onChange, unitPrice }: RouteCardProps) 
                 pattern="[0-9]*"
                 value={data.completed || ''}
                 onChange={(e) => updateField('completed', parseInt(e.target.value.replace(/\D/g, '')) || 0)}
-                className="w-20 h-10 text-center text-xl font-bold bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-success/50 text-success"
+                className="w-14 h-11 text-center text-xl font-bold bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-success/50 text-success"
               />
               <button
                 type="button"
                 onClick={() => updateField('completed', data.completed + 1)}
-                className="w-10 h-10 rounded-full bg-success text-success-foreground flex items-center justify-center hover:bg-success/90 transition-colors"
+                className="w-11 h-11 rounded-full bg-success text-success-foreground flex items-center justify-center hover:bg-success/90 transition-colors touch-target"
               >
                 <Plus className="w-4 h-4" />
               </button>
