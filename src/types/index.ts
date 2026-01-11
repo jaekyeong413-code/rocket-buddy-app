@@ -39,6 +39,9 @@ export interface FreshBagData {
   regularAllocated: number;
   standaloneAllocated: number;
 
+  // 라우트별 분배 (206A만 입력, 203D는 자동 계산)
+  route206ACount: number;
+
   // 조정
   regularAdjustment: number; // 단독 → 일반 전환
   transferred: number;       // 이관(-)

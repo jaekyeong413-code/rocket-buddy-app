@@ -31,7 +31,8 @@ const Index = () => {
       title: '저장 완료',
       description: '작업 기록이 저장되었습니다.',
     });
-    setActiveTab('dashboard');
+    // 저장 후에도 입력탭에 머물기 (사용자 요청: 즉시 수정 가능하도록)
+    // setActiveTab('dashboard'); // 제거됨
   };
 
   return (
