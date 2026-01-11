@@ -74,10 +74,21 @@ export const useStore = create<AppState>()(
           settings: { ...state.settings, ...newSettings },
         })),
       
+      // 같은 날짜+라우트+회전 기록이 있으면 덮어쓰기(update), 없으면 추가
       addRecord: (record) =>
-        set((state) => ({
-          records: [...state.records, record],
-        })),
+        set((state) => {
+          const existingIndex = state.records.findIndex(
+            (r) => r.date === record.date && r.route === record.route && r.round === record.round
+          );
+          if (existingIndex >= 0) {
+            // 덮어쓰기
+            const updated = [...state.records];
+            updated[existingIndex] = record;
+            return { records: updated };
+          }
+          // 신규 추가
+          return { records: [...state.records, record] };
+        }),
       
       updateRecord: (id, updates) =>
         set((state) => ({
@@ -169,17 +180,12 @@ export const useStore = create<AppState>()(
         return get().currentInputDate;
       },
 
-      // 저장 성공 시 해당 날짜 데이터 초기화 + 날짜를 오늘로 변경
-      clearWorkData: (date) =>
-        set((state) => {
-          const today = formatDate(new Date());
-          const newWorkDataByDate = { ...state.workDataByDate };
-          delete newWorkDataByDate[date];
-          return {
-            workDataByDate: newWorkDataByDate,
-            currentInputDate: today,
-          };
-        }),
+      // 저장 성공 시 - 입력값은 유지하고 기록만 저장됨 (사용자 요청)
+      // clearWorkData는 더 이상 입력값을 지우지 않음
+      clearWorkData: (_date) => {
+        // 의도적으로 아무것도 하지 않음 - 저장 후에도 입력값 유지
+        // 사용자가 즉시 수정 후 다시 저장할 수 있어야 함
+      },
 
       // 오늘 입력 데이터 조회 (대시보드 실시간 표시용)
       getTodayWorkData: () => {

@@ -430,6 +430,7 @@ export function createDefaultFreshBagData(): FreshBagData {
   return {
     regularAllocated: 0,
     standaloneAllocated: 0,
+    route206ACount: 0,
     regularAdjustment: 0,
     transferred: 0,
     added: 0,

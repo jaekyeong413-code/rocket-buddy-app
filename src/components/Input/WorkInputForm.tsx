@@ -7,6 +7,7 @@ import {
   formatDate, 
   createDefaultReturnsData, 
   createDefaultFreshBagData,
+  createDefaultDeliveryData,
   calculateDailyIncome,
   formatCurrency,
 } from '@/lib/calculations';
@@ -26,7 +27,6 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     updateWorkData,
     getCurrentInputDate,
     setCurrentInputDate,
-    clearWorkData,
   } = useStore();
   
   // 현재 입력 날짜 (store에서 관리 - 탭 이동해도 유지)
@@ -45,9 +45,39 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const returns = workData.returns;
   const freshBag = workData.freshBag;
 
-  // 날짜 변경
+  // 날짜 변경 시 저장된 기록이 있으면 prefill
   const handleDateChange = (newDate: string) => {
     setCurrentInputDate(newDate);
+    
+    // 이미 workDataByDate에 데이터가 있으면 그대로 사용
+    const existingWorkData = getWorkData(newDate);
+    if (existingWorkData.firstAllocationDelivery > 0 || 
+        existingWorkData.routes['203D'].allocated > 0 || 
+        existingWorkData.routes['206A'].allocated > 0) {
+      return; // 이미 입력 데이터가 있음
+    }
+    
+    // 저장된 records에서 해당 날짜 데이터 로드 (prefill)
+    const savedRecords = records.filter(r => r.date === newDate);
+    if (savedRecords.length > 0) {
+      const record203D = savedRecords.find(r => r.route === '203D');
+      const record206A = savedRecords.find(r => r.route === '206A');
+      
+      const total203D = record203D?.delivery.allocated || 0;
+      const total206A = record206A?.delivery.allocated || 0;
+      const totalAlloc = total203D + total206A;
+      
+      updateWorkData(newDate, {
+        firstAllocationDelivery: totalAlloc,
+        firstAllocationReturns: record203D?.returns.allocated || 0,
+        routes: {
+          '203D': record203D?.delivery || createDefaultDeliveryData(),
+          '206A': record206A?.delivery || createDefaultDeliveryData(),
+        },
+        returns: record203D?.returns || createDefaultReturnsData(),
+        freshBag: record203D?.freshBag || createDefaultFreshBagData(),
+      });
+    }
   };
 
   const adjustDate = (days: number) => {
@@ -258,8 +288,8 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
 
     toast.success('작업 기록이 저장되었습니다!');
     
-    // 저장 성공 시 해당 날짜 입력 데이터 초기화 + 오늘 날짜로 변경
-    clearWorkData(date);
+    // 저장 후에도 입력값 유지 - 사용자가 즉시 수정 후 다시 저장 가능
+    // clearWorkData 호출 제거 (사용자 요청)
     
     onComplete?.();
   };
@@ -402,16 +432,53 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
               />
             </div>
           </div>
-          {/* 회수율 2층 표시 */}
+
+          {/* 프레시백 라우트 분배 (206A 입력, 203D 자동 계산) */}
           {(freshBag.regularAllocated > 0 || freshBag.standaloneAllocated > 0) && (
-            <div className="flex justify-between mt-3 text-xs">
-              <span className="text-muted-foreground">
-                진행률: <span className="font-bold text-success">{progressFBRate}%</span>
-              </span>
-              <span className="text-muted-foreground">
-                단독 회수율: <span className="font-bold text-primary">{standaloneFBRate}%</span>
-              </span>
-            </div>
+            <>
+              <div className="mt-4 pt-3 border-t border-success/20">
+                <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                  라우트별 분배
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">206A</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={freshBag.route206ACount || ''}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                        handleFreshBagChange({ ...freshBag, route206ACount: val });
+                      }}
+                      placeholder="직접 입력"
+                      className="w-full h-10 px-3 text-base font-bold text-center bg-background rounded-xl border-2 border-primary/30 focus:border-primary focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">203D (자동)</label>
+                    <div className={`w-full h-10 px-3 text-base font-bold text-center rounded-xl border-2 flex items-center justify-center ${
+                      totalFBAllocated - (freshBag.route206ACount || 0) < 0 
+                        ? 'bg-destructive/10 border-destructive/30 text-destructive' 
+                        : 'bg-muted border-border/30 text-foreground'
+                    }`}>
+                      {totalFBAllocated - (freshBag.route206ACount || 0)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 회수율 2층 표시 */}
+              <div className="flex justify-between mt-3 text-xs">
+                <span className="text-muted-foreground">
+                  진행률: <span className="font-bold text-success">{progressFBRate}%</span>
+                </span>
+                <span className="text-muted-foreground">
+                  단독 회수율: <span className="font-bold text-primary">{standaloneFBRate}%</span>
+                </span>
+              </div>
+            </>
           )}
         </div>
 
