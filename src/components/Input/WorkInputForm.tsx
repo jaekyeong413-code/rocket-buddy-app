@@ -433,53 +433,49 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             </div>
           </div>
 
-          {/* 프레시백 라우트 분배 (206A 입력, 203D 자동 계산) */}
-          {(freshBag.regularAllocated > 0 || freshBag.standaloneAllocated > 0) && (
-            <>
-              <div className="mt-4 pt-3 border-t border-success/20">
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">
-                  라우트별 분배
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">206A</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={freshBag.route206ACount || ''}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                        handleFreshBagChange({ ...freshBag, route206ACount: val });
-                      }}
-                      placeholder="직접 입력"
-                      className="w-full h-10 px-3 text-base font-bold text-center bg-background rounded-xl border-2 border-primary/30 focus:border-primary focus:outline-none transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">203D (자동)</label>
-                    <div className={`w-full h-10 px-3 text-base font-bold text-center rounded-xl border-2 flex items-center justify-center ${
-                      totalFBAllocated - (freshBag.route206ACount || 0) < 0 
-                        ? 'bg-destructive/10 border-destructive/30 text-destructive' 
-                        : 'bg-muted border-border/30 text-foreground'
-                    }`}>
-                      {totalFBAllocated - (freshBag.route206ACount || 0)}
-                    </div>
-                  </div>
+          {/* 프레시백 라우트 분배 (206A 입력, 203D 자동 계산) - 항상 표시 */}
+          <div className="mt-4 pt-3 border-t border-success/20">
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              라우트별 분배
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">206A</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={freshBag.route206ACount || ''}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                    handleFreshBagChange({ ...freshBag, route206ACount: val });
+                  }}
+                  placeholder="직접 입력"
+                  className="w-full h-10 px-3 text-base font-bold text-center bg-background rounded-xl border-2 border-primary/30 focus:border-primary focus:outline-none transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">203D (자동)</label>
+                <div className={`w-full h-10 px-3 text-base font-bold text-center rounded-xl border-2 flex items-center justify-center ${
+                  totalFBAllocated - (freshBag.route206ACount || 0) < 0 
+                    ? 'bg-destructive/10 border-destructive/30 text-destructive' 
+                    : 'bg-muted border-border/30 text-foreground'
+                }`}>
+                  {totalFBAllocated - (freshBag.route206ACount || 0)}
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* 회수율 2층 표시 */}
-              <div className="flex justify-between mt-3 text-xs">
-                <span className="text-muted-foreground">
-                  진행률: <span className="font-bold text-success">{progressFBRate}%</span>
-                </span>
-                <span className="text-muted-foreground">
-                  단독 회수율: <span className="font-bold text-primary">{standaloneFBRate}%</span>
-                </span>
-              </div>
-            </>
-          )}
+          {/* 회수율 2층 표시 */}
+          <div className="flex justify-between mt-3 text-xs">
+            <span className="text-muted-foreground">
+              진행률: <span className="font-bold text-success">{progressFBRate}%</span>
+            </span>
+            <span className="text-muted-foreground">
+              단독 회수율: <span className="font-bold text-primary">{standaloneFBRate}%</span>
+            </span>
+          </div>
         </div>
 
         {/* 1회전 잔여 포함 전체 남은 물량 */}
