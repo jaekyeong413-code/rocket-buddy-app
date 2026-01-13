@@ -83,11 +83,21 @@ export function TodayIncomeCard() {
   const freshBag = todayWorkData.freshBag;
   const returns = todayWorkData.returns;
   
-  // 1차 할당, 2차 할당(firstRoundRemaining), 또는 완료가 있으면 레코드 생성
-  const has203DData = (delivery203D.allocated || 0) > 0 || 
+  // 모든 단계(A~F)의 입력을 포함하여 레코드 생성 여부 결정
+  // 어떤 값이든 입력되면 즉시 계산에 반영되어야 함
+  const hasAnyDeliveryInput = 
+    (todayWorkData.firstAllocationDelivery || 0) > 0 ||
+    (todayWorkData.totalRemainingAfterFirstRound || 0) > 0 ||
+    (todayWorkData.round1EndRemaining || 0) > 0 ||
+    (todayWorkData.round2TotalRemaining || 0) > 0 ||
+    (todayWorkData.round2EndRemaining || 0) > 0;
+  
+  const has203DData = hasAnyDeliveryInput ||
+                      (delivery203D.allocated || 0) > 0 || 
                       (delivery203D.firstRoundRemaining || 0) > 0 || 
                       (delivery203D.completed || 0) > 0;
-  const has206AData = (delivery206A.allocated || 0) > 0 || 
+  const has206AData = hasAnyDeliveryInput ||
+                      (delivery206A.allocated || 0) > 0 || 
                       (delivery206A.firstRoundRemaining || 0) > 0 || 
                       (delivery206A.completed || 0) > 0;
   
@@ -383,11 +393,20 @@ export function TodayProgress() {
   const delivery203D = todayWorkData.routes['203D'];
   const delivery206A = todayWorkData.routes['206A'];
   
-  // 1차 할당, 2차 할당(firstRoundRemaining), 또는 완료가 있으면 레코드 생성
-  const has203DData = (delivery203D.allocated || 0) > 0 || 
+  // 모든 단계(A~F)의 입력을 포함하여 레코드 생성 여부 결정
+  const hasAnyDeliveryInput = 
+    (todayWorkData.firstAllocationDelivery || 0) > 0 ||
+    (todayWorkData.totalRemainingAfterFirstRound || 0) > 0 ||
+    (todayWorkData.round1EndRemaining || 0) > 0 ||
+    (todayWorkData.round2TotalRemaining || 0) > 0 ||
+    (todayWorkData.round2EndRemaining || 0) > 0;
+  
+  const has203DData = hasAnyDeliveryInput ||
+                      (delivery203D.allocated || 0) > 0 || 
                       (delivery203D.firstRoundRemaining || 0) > 0 || 
                       (delivery203D.completed || 0) > 0;
-  const has206AData = (delivery206A.allocated || 0) > 0 || 
+  const has206AData = hasAnyDeliveryInput ||
+                      (delivery206A.allocated || 0) > 0 || 
                       (delivery206A.firstRoundRemaining || 0) > 0 || 
                       (delivery206A.completed || 0) > 0;
   
