@@ -163,10 +163,24 @@ export const useStore = create<AppState>()(
           };
         }),
 
-      // 날짜별 작업 데이터 조회
+      // 날짜별 작업 데이터 조회 (안전한 기본값 보장)
       getWorkData: (date) => {
         const state = get();
-        return state.workDataByDate[date] || createDefaultTodayWorkData(date);
+        const existing = state.workDataByDate[date];
+        if (!existing) {
+          return createDefaultTodayWorkData(date);
+        }
+        // 기존 데이터의 routes가 없거나 불완전한 경우 기본값 병합
+        return {
+          ...createDefaultTodayWorkData(date),
+          ...existing,
+          routes: {
+            '203D': { ...createDefaultDeliveryData(), ...(existing.routes?.['203D'] || {}) },
+            '206A': { ...createDefaultDeliveryData(), ...(existing.routes?.['206A'] || {}) },
+          },
+          returns: { ...createDefaultReturnsData(), ...(existing.returns || {}) },
+          freshBag: { ...createDefaultFreshBagData(), ...(existing.freshBag || {}) },
+        };
       },
 
       // 현재 입력 날짜 설정
@@ -187,11 +201,25 @@ export const useStore = create<AppState>()(
         // 사용자가 즉시 수정 후 다시 저장할 수 있어야 함
       },
 
-      // 오늘 입력 데이터 조회 (대시보드 실시간 표시용)
+      // 오늘 입력 데이터 조회 (대시보드 실시간 표시용 - 안전한 기본값 보장)
       getTodayWorkData: () => {
         const state = get();
         const today = formatDate(new Date());
-        return state.workDataByDate[today] || createDefaultTodayWorkData(today);
+        const existing = state.workDataByDate[today];
+        if (!existing) {
+          return createDefaultTodayWorkData(today);
+        }
+        // 기존 데이터의 routes가 없거나 불완전한 경우 기본값 병합
+        return {
+          ...createDefaultTodayWorkData(today),
+          ...existing,
+          routes: {
+            '203D': { ...createDefaultDeliveryData(), ...(existing.routes?.['203D'] || {}) },
+            '206A': { ...createDefaultDeliveryData(), ...(existing.routes?.['206A'] || {}) },
+          },
+          returns: { ...createDefaultReturnsData(), ...(existing.returns || {}) },
+          freshBag: { ...createDefaultFreshBagData(), ...(existing.freshBag || {}) },
+        };
       },
     }),
     {

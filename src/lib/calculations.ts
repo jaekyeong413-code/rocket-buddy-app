@@ -38,12 +38,12 @@ export function calculateActualDeliveries(record: WorkRecord): number {
 
 // 예상 배송 수량 계산 (할당 기준 - 실시간 예상 수입 계산용)
 export function calculateExpectedDeliveries(record: WorkRecord): number {
-  const allocated = record.delivery.allocated || 0;
-  const firstRoundRemaining = record.delivery.firstRoundRemaining || 0;
-  const transferred = record.delivery.transferred || 0;
-  const added = record.delivery.added || 0;
-  const cancelled = record.delivery.cancelled || 0;
-  const incomplete = record.delivery.incomplete || 0;
+  const allocated = record.delivery?.allocated ?? 0;
+  const firstRoundRemaining = record.delivery?.firstRoundRemaining ?? 0;
+  const transferred = record.delivery?.transferred ?? 0;
+  const added = record.delivery?.added ?? 0;
+  const cancelled = record.delivery?.cancelled ?? 0;
+  const incomplete = record.delivery?.incomplete ?? 0;
   
   // 할당 + 1회전잔여 + 추가 - 이관 - 취소 - 미완료 = 예상 완료량
   return Math.max(0, allocated + firstRoundRemaining + added - transferred - cancelled - incomplete);
