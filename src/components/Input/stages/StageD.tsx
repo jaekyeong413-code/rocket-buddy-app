@@ -17,9 +17,9 @@ export function StageD({
 }: StageDProps) {
   const freshBag = workData.freshBag;
 
-  // 1회전 종료 시점 기준값 (Stage C에서 입력)
-  const baseRegular = workData.freshBagRound1EndRegular || 0;
-  const baseStandalone = workData.freshBagRound1EndStandalone || 0;
+  // 1회전 종료 시점 기준값 (Stage C에서 입력 - freshBag에 저장됨)
+  const baseRegular = freshBag.round1EndRegular || 0;
+  const baseStandalone = freshBag.round1EndStandalone || 0;
 
   // 전환 입력값
   const [regularToStandalone, setRegularToStandalone] = useState(freshBag.regularToStandalone || 0);
@@ -42,7 +42,7 @@ export function StageD({
         // 최종값 저장
         round2Regular: finalRegular,
         round2Standalone: finalStandalone,
-      } as FreshBagData);
+      });
     }
   }, [regularToStandalone, standaloneToRegular, hasError]);
 

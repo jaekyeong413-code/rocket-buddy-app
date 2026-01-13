@@ -45,7 +45,7 @@ export function StageF({
               value={freshBag.finalRegularCompleted || ''}
               onChange={(e) => {
                 const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                onFreshBagChange({ ...freshBag, finalRegularCompleted: val } as FreshBagData);
+                onFreshBagChange({ ...freshBag, finalRegularCompleted: val });
               }}
               placeholder="0"
               className="w-full h-14 px-3 text-xl font-bold text-center bg-success/10 rounded-xl border-2 border-success/30 focus:border-success focus:outline-none transition-colors"
@@ -60,7 +60,7 @@ export function StageF({
               value={freshBag.finalStandaloneCompleted || ''}
               onChange={(e) => {
                 const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                onFreshBagChange({ ...freshBag, finalStandaloneCompleted: val } as FreshBagData);
+                onFreshBagChange({ ...freshBag, finalStandaloneCompleted: val });
               }}
               placeholder="0"
               className="w-full h-14 px-3 text-xl font-bold text-center bg-success/10 rounded-xl border-2 border-success/30 focus:border-success focus:outline-none transition-colors"
