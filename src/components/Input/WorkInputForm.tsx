@@ -153,10 +153,20 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const todayRecords = records.filter(r => r.date === date);
   const currentInputAsRecords: WorkRecord[] = [];
   
-  const has203DData = (delivery203D.allocated || 0) > 0 || 
+  // 모든 단계(A~F)의 입력을 포함하여 레코드 생성 여부 결정
+  const hasAnyDeliveryInput = 
+    (workData.firstAllocationDelivery || 0) > 0 ||
+    (workData.totalRemainingAfterFirstRound || 0) > 0 ||
+    (workData.round1EndRemaining || 0) > 0 ||
+    (workData.round2TotalRemaining || 0) > 0 ||
+    (workData.round2EndRemaining || 0) > 0;
+  
+  const has203DData = hasAnyDeliveryInput ||
+                      (delivery203D.allocated || 0) > 0 || 
                       (delivery203D.firstRoundRemaining || 0) > 0 || 
                       (delivery203D.completed || 0) > 0;
-  const has206AData = (delivery206A.allocated || 0) > 0 || 
+  const has206AData = hasAnyDeliveryInput ||
+                      (delivery206A.allocated || 0) > 0 || 
                       (delivery206A.firstRoundRemaining || 0) > 0 || 
                       (delivery206A.completed || 0) > 0;
   
