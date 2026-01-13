@@ -83,7 +83,15 @@ export function TodayIncomeCard() {
   const freshBag = todayWorkData.freshBag;
   const returns = todayWorkData.returns;
   
-  if (delivery203D.allocated > 0 || delivery203D.completed > 0) {
+  // 1차 할당, 2차 할당(firstRoundRemaining), 또는 완료가 있으면 레코드 생성
+  const has203DData = (delivery203D.allocated || 0) > 0 || 
+                      (delivery203D.firstRoundRemaining || 0) > 0 || 
+                      (delivery203D.completed || 0) > 0;
+  const has206AData = (delivery206A.allocated || 0) > 0 || 
+                      (delivery206A.firstRoundRemaining || 0) > 0 || 
+                      (delivery206A.completed || 0) > 0;
+  
+  if (has203DData) {
     currentInputAsRecords.push({
       id: 'temp-203d',
       date: today,
@@ -95,7 +103,7 @@ export function TodayIncomeCard() {
     });
   }
   
-  if (delivery206A.allocated > 0 || delivery206A.completed > 0) {
+  if (has206AData) {
     currentInputAsRecords.push({
       id: 'temp-206a',
       date: today,
@@ -375,7 +383,15 @@ export function TodayProgress() {
   const delivery203D = todayWorkData.routes['203D'];
   const delivery206A = todayWorkData.routes['206A'];
   
-  if (delivery203D.allocated > 0 || delivery203D.completed > 0) {
+  // 1차 할당, 2차 할당(firstRoundRemaining), 또는 완료가 있으면 레코드 생성
+  const has203DData = (delivery203D.allocated || 0) > 0 || 
+                      (delivery203D.firstRoundRemaining || 0) > 0 || 
+                      (delivery203D.completed || 0) > 0;
+  const has206AData = (delivery206A.allocated || 0) > 0 || 
+                      (delivery206A.firstRoundRemaining || 0) > 0 || 
+                      (delivery206A.completed || 0) > 0;
+  
+  if (has203DData) {
     currentInputAsRecords.push({
       id: 'temp-203d',
       date: today,
@@ -387,7 +403,7 @@ export function TodayProgress() {
     });
   }
   
-  if (delivery206A.allocated > 0 || delivery206A.completed > 0) {
+  if (has206AData) {
     currentInputAsRecords.push({
       id: 'temp-206a',
       date: today,
