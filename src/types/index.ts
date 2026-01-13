@@ -47,6 +47,23 @@ export interface FreshBagData {
   transferred: number;       // 이관(-)
   added: number;             // 추가(+)
 
+  // 1회전 종료 시점 잔여 (Stage C)
+  round1EndRegular?: number;
+  round1EndStandalone?: number;
+
+  // 2회전 전환 (Stage D)
+  regularToStandalone?: number;
+  standaloneToRegular?: number;
+  round2Regular?: number;
+  round2Standalone?: number;
+
+  // 2회전 미확인 (Stage E)
+  round2FailedAbsent?: number;
+
+  // 최종 완료 (Stage F)
+  finalRegularCompleted?: number;
+  finalStandaloneCompleted?: number;
+
   // 미회수 (회수율 인정, 단가 미지급)
   failedAbsent: number;        // 부재
   failedNoProduct: number;     // 프레시백 없음
@@ -77,6 +94,16 @@ export interface TodayWorkData {
   };
   returns: ReturnsData;
   freshBag: FreshBagData;
+  
+  // 단계별 추가 필드
+  currentStage?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+  freshBagRound1EndRegular?: number;    // Stage C: 1회전 종료 일반 잔여
+  freshBagRound1EndStandalone?: number; // Stage C: 1회전 종료 단독 잔여
+  round1EndRemaining?: number;          // Stage C: 1회전 종료 잔여 물량
+  round2TotalRemaining?: number;        // Stage D: 2회전 전체 잔여
+  round2TotalReturns?: number;          // Stage D: 2회전 전체 반품
+  round2EndRemaining?: number;          // Stage E: 2회전 종료 잔여
+  round2EndReturnsRemaining?: number;   // Stage E: 2회전 종료 반품 잔여
 }
 
 export interface DailyStats {
