@@ -14,10 +14,6 @@ export function StageC({
 }: StageCProps) {
   const freshBag = workData.freshBag;
 
-  // 1회전 종료 시점 프레시백 잔여 (별도 필드 사용 - 기존 필드 재활용)
-  // regularAdjustment를 일반 잔여로, transferred를 단독 잔여로 임시 사용
-  // 실제로는 새 필드를 추가해야 하지만 기존 구조 활용
-
   return (
     <div className="space-y-4 animate-slide-up">
       {/* 단계 설명 */}
@@ -41,11 +37,10 @@ export function StageC({
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              value={workData.freshBagRound1EndRegular || ''}
+              value={freshBag.round1EndRegular || ''}
               onChange={(e) => {
                 const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                // workData에 직접 저장 (store 확장 필요)
-                onFreshBagChange({ ...freshBag, round1EndRegular: val } as FreshBagData);
+                onFreshBagChange({ ...freshBag, round1EndRegular: val });
               }}
               placeholder="0"
               className="w-full h-14 px-3 text-xl font-bold text-center bg-muted rounded-xl border-2 border-success/30 focus:border-success focus:outline-none transition-colors"
@@ -57,10 +52,10 @@ export function StageC({
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              value={workData.freshBagRound1EndStandalone || ''}
+              value={freshBag.round1EndStandalone || ''}
               onChange={(e) => {
                 const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                onFreshBagChange({ ...freshBag, round1EndStandalone: val } as FreshBagData);
+                onFreshBagChange({ ...freshBag, round1EndStandalone: val });
               }}
               placeholder="0"
               className="w-full h-14 px-3 text-xl font-bold text-center bg-muted rounded-xl border-2 border-success/30 focus:border-success focus:outline-none transition-colors"

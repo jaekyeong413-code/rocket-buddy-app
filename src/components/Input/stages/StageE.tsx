@@ -68,7 +68,7 @@ export function StageE({
           value={freshBag.round2FailedAbsent || ''}
           onChange={(e) => {
             const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-            onFreshBagChange({ ...freshBag, round2FailedAbsent: val } as FreshBagData);
+            onFreshBagChange({ ...freshBag, round2FailedAbsent: val });
           }}
           placeholder="0"
           className="w-full h-12 px-4 text-lg font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-success focus:outline-none transition-colors"
