@@ -153,12 +153,17 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const todayRecords = records.filter(r => r.date === date);
   const currentInputAsRecords: WorkRecord[] = [];
   
+  // 2차 관련 필드
+  const round2Remaining = workData.round2TotalRemaining || 0;
+  const round1EndRemaining = workData.round1EndRemaining || 0;
+  const firstAllocDelivery = workData.firstAllocationDelivery || 0;
+  
   // 모든 단계(A~F)의 입력을 포함하여 레코드 생성 여부 결정
   const hasAnyDeliveryInput = 
-    (workData.firstAllocationDelivery || 0) > 0 ||
+    firstAllocDelivery > 0 ||
     (workData.totalRemainingAfterFirstRound || 0) > 0 ||
-    (workData.round1EndRemaining || 0) > 0 ||
-    (workData.round2TotalRemaining || 0) > 0 ||
+    round1EndRemaining > 0 ||
+    round2Remaining > 0 ||
     (workData.round2EndRemaining || 0) > 0;
   
   const has203DData = hasAnyDeliveryInput ||
@@ -170,13 +175,29 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
                       (delivery206A.firstRoundRemaining || 0) > 0 || 
                       (delivery206A.completed || 0) > 0;
   
+  // 2차 데이터를 포함한 DeliveryData 생성 (계산 로직이 읽을 수 있도록)
+  const createEnhancedDelivery = (baseDelivery: typeof delivery203D, ratio: number): typeof delivery203D => {
+    const allocated = (baseDelivery.allocated || 0) > 0 
+      ? baseDelivery.allocated 
+      : Math.round(firstAllocDelivery * ratio);
+    const additionalRemaining = Math.round((round2Remaining + round1EndRemaining) * ratio);
+    return {
+      ...baseDelivery,
+      allocated,
+      firstRoundRemaining: (baseDelivery.firstRoundRemaining || 0) + additionalRemaining,
+    };
+  };
+  
+  const ratio203D = 0.5;
+  const ratio206A = 0.5;
+  
   if (has203DData) {
     currentInputAsRecords.push({
       id: 'temp-203d',
       date,
       route: '203D',
       round: 1,
-      delivery: delivery203D,
+      delivery: createEnhancedDelivery(delivery203D, ratio203D),
       returns,
       freshBag,
     });
@@ -188,7 +209,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
       date,
       route: '206A',
       round: 1,
-      delivery: delivery206A,
+      delivery: createEnhancedDelivery(delivery206A, ratio206A),
       returns: createDefaultReturnsData(),
       freshBag: createDefaultFreshBagData(),
     });

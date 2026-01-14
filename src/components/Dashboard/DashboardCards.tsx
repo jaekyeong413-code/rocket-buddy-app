@@ -83,13 +83,21 @@ export function TodayIncomeCard() {
   const freshBag = todayWorkData.freshBag;
   const returns = todayWorkData.returns;
   
+  // 2차 관련 필드들을 DeliveryData에 매핑 (계산 로직이 읽을 수 있도록)
+  // round2TotalRemaining = 1회전 잔여 포함 전체 남은 물량 (2차 상차 시점)
+  // 이 값이 있으면 firstRoundRemaining에 추가 반영
+  const round2Remaining = todayWorkData.round2TotalRemaining || 0;
+  const round1EndRemaining = todayWorkData.round1EndRemaining || 0;
+  
+  // 1차 할당 배송량을 routes에 반영 (Stage A 입력 시)
+  const firstAllocationDelivery = todayWorkData.firstAllocationDelivery || 0;
+  
   // 모든 단계(A~F)의 입력을 포함하여 레코드 생성 여부 결정
-  // 어떤 값이든 입력되면 즉시 계산에 반영되어야 함
   const hasAnyDeliveryInput = 
-    (todayWorkData.firstAllocationDelivery || 0) > 0 ||
+    firstAllocationDelivery > 0 ||
     (todayWorkData.totalRemainingAfterFirstRound || 0) > 0 ||
-    (todayWorkData.round1EndRemaining || 0) > 0 ||
-    (todayWorkData.round2TotalRemaining || 0) > 0 ||
+    round1EndRemaining > 0 ||
+    round2Remaining > 0 ||
     (todayWorkData.round2EndRemaining || 0) > 0;
   
   const has203DData = hasAnyDeliveryInput ||
@@ -101,13 +109,35 @@ export function TodayIncomeCard() {
                       (delivery206A.firstRoundRemaining || 0) > 0 || 
                       (delivery206A.completed || 0) > 0;
   
+  // 2차 데이터를 포함한 DeliveryData 생성
+  // 계산 로직(calculateExpectedDeliveries)이 allocated + firstRoundRemaining을 사용하므로
+  // 2차 데이터(round2TotalRemaining)를 firstRoundRemaining에 합산
+  const createEnhancedDelivery = (baseDelivery: typeof delivery203D, ratio: number): typeof delivery203D => {
+    const allocated = (baseDelivery.allocated || 0) > 0 
+      ? baseDelivery.allocated 
+      : Math.round(firstAllocationDelivery * ratio);
+    
+    // 2차 잔여물량이 있으면 firstRoundRemaining에 합산 (계산식에 반영되도록)
+    const additionalRemaining = Math.round((round2Remaining + round1EndRemaining) * ratio);
+    
+    return {
+      ...baseDelivery,
+      allocated,
+      firstRoundRemaining: (baseDelivery.firstRoundRemaining || 0) + additionalRemaining,
+    };
+  };
+  
+  // 라우트 비율 (기본값 50:50, 과거 데이터 기반 학습 가능)
+  const ratio203D = 0.5;
+  const ratio206A = 0.5;
+  
   if (has203DData) {
     currentInputAsRecords.push({
       id: 'temp-203d',
       date: today,
       route: '203D',
       round: 1,
-      delivery: delivery203D,
+      delivery: createEnhancedDelivery(delivery203D, ratio203D),
       returns,
       freshBag,
     });
@@ -119,7 +149,7 @@ export function TodayIncomeCard() {
       date: today,
       route: '206A',
       round: 1,
-      delivery: delivery206A,
+      delivery: createEnhancedDelivery(delivery206A, ratio206A),
       returns: createDefaultReturnsData(),
       freshBag: createDefaultFreshBagData(),
     });
@@ -393,12 +423,17 @@ export function TodayProgress() {
   const delivery203D = todayWorkData.routes['203D'];
   const delivery206A = todayWorkData.routes['206A'];
   
+  // 2차 관련 필드
+  const round2Remaining = todayWorkData.round2TotalRemaining || 0;
+  const round1EndRemaining = todayWorkData.round1EndRemaining || 0;
+  const firstAllocationDelivery = todayWorkData.firstAllocationDelivery || 0;
+  
   // 모든 단계(A~F)의 입력을 포함하여 레코드 생성 여부 결정
   const hasAnyDeliveryInput = 
-    (todayWorkData.firstAllocationDelivery || 0) > 0 ||
+    firstAllocationDelivery > 0 ||
     (todayWorkData.totalRemainingAfterFirstRound || 0) > 0 ||
-    (todayWorkData.round1EndRemaining || 0) > 0 ||
-    (todayWorkData.round2TotalRemaining || 0) > 0 ||
+    round1EndRemaining > 0 ||
+    round2Remaining > 0 ||
     (todayWorkData.round2EndRemaining || 0) > 0;
   
   const has203DData = hasAnyDeliveryInput ||
@@ -410,13 +445,29 @@ export function TodayProgress() {
                       (delivery206A.firstRoundRemaining || 0) > 0 || 
                       (delivery206A.completed || 0) > 0;
   
+  // 2차 데이터를 포함한 DeliveryData 생성
+  const createEnhancedDelivery = (baseDelivery: typeof delivery203D, ratio: number): typeof delivery203D => {
+    const allocated = (baseDelivery.allocated || 0) > 0 
+      ? baseDelivery.allocated 
+      : Math.round(firstAllocationDelivery * ratio);
+    const additionalRemaining = Math.round((round2Remaining + round1EndRemaining) * ratio);
+    return {
+      ...baseDelivery,
+      allocated,
+      firstRoundRemaining: (baseDelivery.firstRoundRemaining || 0) + additionalRemaining,
+    };
+  };
+  
+  const ratio203D = 0.5;
+  const ratio206A = 0.5;
+  
   if (has203DData) {
     currentInputAsRecords.push({
       id: 'temp-203d',
       date: today,
       route: '203D',
       round: 1,
-      delivery: delivery203D,
+      delivery: createEnhancedDelivery(delivery203D, ratio203D),
       returns: todayWorkData.returns,
       freshBag: todayWorkData.freshBag,
     });
@@ -428,7 +479,7 @@ export function TodayProgress() {
       date: today,
       route: '206A',
       round: 1,
-      delivery: delivery206A,
+      delivery: createEnhancedDelivery(delivery206A, ratio206A),
       returns: createDefaultReturnsData(),
       freshBag: createDefaultFreshBagData(),
     });
