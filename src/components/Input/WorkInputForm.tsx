@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { StageIndicator, StageKey } from './StageIndicator';
 import { StageA, StageB, StageC, StageD, StageE, StageF } from './stages';
 
+
 export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const { 
     addRecord, 

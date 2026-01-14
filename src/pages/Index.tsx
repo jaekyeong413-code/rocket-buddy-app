@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/Layout/Header';
 import { BottomNavigation } from '@/components/Navigation/BottomNavigation';
 import {
@@ -14,10 +14,19 @@ import { SettingsPage } from '@/components/Settings/SettingsPage';
 import { AuthGate } from '@/components/Security/AuthGate';
 import { WorkRecord } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useStore } from '@/store/useStore';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const { toast } = useToast();
+  const { initialize, initialized } = useStore();
+  
+  // 앱 시작 시 로컬 스토리지에서 데이터 로드 및 마이그레이션
+  useEffect(() => {
+    if (!initialized) {
+      initialize();
+    }
+  }, [initialize, initialized]);
 
   const handleRecordEdit = (record: WorkRecord) => {
     toast({
@@ -32,7 +41,6 @@ const Index = () => {
       description: '작업 기록이 저장되었습니다.',
     });
     // 저장 후에도 입력탭에 머물기 (사용자 요청: 즉시 수정 가능하도록)
-    // setActiveTab('dashboard'); // 제거됨
   };
 
   return (
