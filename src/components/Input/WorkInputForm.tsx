@@ -96,19 +96,25 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
 
   // Stage B 핸들러들
   const handleTotalRemainingChange = (value: string) => {
-    const remaining = parseInt(value) || 0;
+    // 빈 문자열이면 0, 아니면 파싱 (0도 유효한 값으로 처리)
+    const remaining = value === '' ? 0 : parseInt(value);
     updateWorkData(date, { totalRemainingAfterFirstRound: remaining });
   };
 
   const handle203DRemainingChange = (value: string) => {
-    const remaining203D = parseInt(value) || 0;
+    // 빈 문자열이면 0, 아니면 파싱 (0도 유효한 값으로 처리)
+    const remaining203D = value === '' ? 0 : parseInt(value);
     const totalRemaining = workData.totalRemainingAfterFirstRound || 0;
-    const remaining206A = Math.max(0, totalRemaining - remaining203D);
     
+    // 클램프: 0 ~ totalRemaining 범위
+    const clampedRemaining203D = Math.max(0, Math.min(remaining203D, totalRemaining));
+    const remaining206A = Math.max(0, totalRemaining - clampedRemaining203D);
+    
+    // SET 방식: 입력값으로 직접 대체 (누적 아님)
     updateWorkData(date, {
       routes: {
         ...workData.routes,
-        '203D': { ...delivery203D, firstRoundRemaining: remaining203D },
+        '203D': { ...delivery203D, firstRoundRemaining: clampedRemaining203D },
         '206A': { ...delivery206A, firstRoundRemaining: remaining206A },
       },
     });
@@ -178,20 +184,21 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
                       (delivery206A.completed || 0) > 0;
   
   // 2차 데이터를 포함한 DeliveryData 생성 (계산 로직이 읽을 수 있도록)
-  // 주의: firstRoundRemaining은 사용자가 입력한 값 그대로 유지 (set, not +=)
-  // additionalRemaining은 별도로 계산하여 합산
+  // 중요: firstRoundRemaining은 사용자가 입력한 값 그대로 유지 (set, not +=)
+  // 2차 잔여물량은 별도 필드로 계산에 전달 (누적하지 않음)
   const createEnhancedDelivery = (baseDelivery: typeof delivery203D, ratio: number): typeof delivery203D => {
     const allocated = (baseDelivery.allocated || 0) > 0 
       ? baseDelivery.allocated 
       : Math.round(firstAllocDelivery * ratio);
-    // 2차 잔여물량은 사용자 입력값에 추가하지 않고 별도로 계산
-    const additionalRemaining = Math.round((round2Remaining + round1EndRemaining) * ratio);
-    // 사용자 입력 firstRoundRemaining + 계산된 추가분
-    const userInputRemaining = baseDelivery.firstRoundRemaining || 0;
+    
+    // 사용자 입력 firstRoundRemaining을 그대로 사용 (2차 물량과 누적하지 않음)
+    const userInputRemaining = baseDelivery.firstRoundRemaining ?? 0;
+    
     return {
       ...baseDelivery,
       allocated,
-      firstRoundRemaining: userInputRemaining + additionalRemaining,
+      // SET 방식: 사용자 입력값만 사용, 누적 없음
+      firstRoundRemaining: userInputRemaining,
     };
   };
   
