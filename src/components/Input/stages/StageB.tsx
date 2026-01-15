@@ -34,7 +34,7 @@ export function StageB({
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={workData.totalRemainingAfterFirstRound || ''}
+          value={workData.totalRemainingAfterFirstRound !== undefined && workData.totalRemainingAfterFirstRound !== null ? String(workData.totalRemainingAfterFirstRound) : ''}
           onChange={(e) => onTotalRemainingChange(e.target.value.replace(/\D/g, ''))}
           placeholder="전체 잔여 물량 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
@@ -50,7 +50,7 @@ export function StageB({
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={delivery203D.firstRoundRemaining || ''}
+          value={delivery203D.firstRoundRemaining !== undefined && delivery203D.firstRoundRemaining !== null ? String(delivery203D.firstRoundRemaining) : ''}
           onChange={(e) => on203DRemainingChange(e.target.value.replace(/\D/g, ''))}
           placeholder="203D 잔여 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-primary/10 rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
@@ -78,9 +78,10 @@ export function StageB({
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={freshBag.failedAbsent || ''}
+          value={freshBag.failedAbsent !== undefined && freshBag.failedAbsent !== null ? String(freshBag.failedAbsent) : ''}
           onChange={(e) => {
-            const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+            const inputValue = e.target.value.replace(/\D/g, '');
+            const val = inputValue === '' ? 0 : parseInt(inputValue);
             onFreshBagChange({ ...freshBag, failedAbsent: val });
           }}
           placeholder="0"
