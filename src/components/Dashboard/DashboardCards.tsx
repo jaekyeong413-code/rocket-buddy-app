@@ -112,18 +112,21 @@ export function TodayIncomeCard() {
   // 2차 데이터를 포함한 DeliveryData 생성
   // 계산 로직(calculateExpectedDeliveries)이 allocated + firstRoundRemaining을 사용하므로
   // 2차 데이터(round2TotalRemaining)를 firstRoundRemaining에 합산
+  // 주의: firstRoundRemaining은 사용자가 입력한 값 그대로 유지 (set, not +=)
   const createEnhancedDelivery = (baseDelivery: typeof delivery203D, ratio: number): typeof delivery203D => {
     const allocated = (baseDelivery.allocated || 0) > 0 
       ? baseDelivery.allocated 
       : Math.round(firstAllocationDelivery * ratio);
     
-    // 2차 잔여물량이 있으면 firstRoundRemaining에 합산 (계산식에 반영되도록)
+    // 2차 잔여물량은 사용자 입력값에 추가하지 않고 별도로 계산
     const additionalRemaining = Math.round((round2Remaining + round1EndRemaining) * ratio);
+    // 사용자 입력 firstRoundRemaining + 계산된 추가분
+    const userInputRemaining = baseDelivery.firstRoundRemaining || 0;
     
     return {
       ...baseDelivery,
       allocated,
-      firstRoundRemaining: (baseDelivery.firstRoundRemaining || 0) + additionalRemaining,
+      firstRoundRemaining: userInputRemaining + additionalRemaining,
     };
   };
   
