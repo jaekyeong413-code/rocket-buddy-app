@@ -161,12 +161,20 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const todayRecords = records.filter(r => r.date === date);
   const currentInputAsRecords: WorkRecord[] = [];
   
-  // 203D 할당 = Stage A 입력값
-  const allocated203D = workData.firstAllocationDelivery || 0;
-  // 206A 할당 = Stage B에서 계산 (전체잔여 - 203D잔여)
+  // ★ Stage A: 배송 1차 전체 물량 (= 203D 1회전 할당)
+  const firstAllocation = workData.firstAllocationDelivery || 0;
+  
+  // ★ Stage B: 1회전 현재 '전체 잔여 물량'
   const totalRemaining = workData.totalRemainingAfterFirstRound || 0;
+  
+  // ★ Stage B: 203D 잔여 물량
   const remaining203D = delivery203D.firstRoundRemaining || 0;
-  const allocated206A = delivery206A.allocated || 0;
+  
+  // ★ 핵심 계산: 203D 실제 처리량 = firstAllocation - totalRemaining
+  const delivered203D = Math.max(0, firstAllocation - totalRemaining);
+  
+  // ★ 206A 할당 = totalRemaining - remaining203D
+  const allocated206A = Math.max(0, totalRemaining - remaining203D);
   
   // 미배송 수량 계산 (수입 차감용)
   const undeliveredByRoute = (workData.undelivered || []).reduce((acc, entry) => {
@@ -174,10 +182,10 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     return acc;
   }, {} as Record<string, number>);
   
-  const has203DData = allocated203D > 0;
+  const has203DData = delivered203D > 0;
   const has206AData = allocated206A > 0;
   
-  // 203D 레코드 생성
+  // 203D 레코드 생성 - ★ allocated에 실제 처리량(delivered203D) 사용
   if (has203DData) {
     currentInputAsRecords.push({
       id: 'temp-203d',
@@ -186,8 +194,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
       round: 1,
       delivery: {
         ...delivery203D,
-        allocated: allocated203D,
-        // 미배송은 물량 변경 없음, cancelled로 처리하여 수입에서 차감
+        allocated: delivered203D, // ★ 할당이 아니라 실제 처리량
         cancelled: undeliveredByRoute['203D'] || 0,
       },
       returns,
@@ -220,19 +227,19 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const estimatedIncome = calculateDailyIncome([...todayRecords, ...currentInputAsRecords], settings) + numberedIncome;
 
   const handleSubmit = () => {
-    // 할당량 학습 데이터 저장
-    if (allocated203D > 0 || allocated206A > 0) {
+    // 할당량 학습 데이터 저장 - ★ 실제 처리량 사용
+    if (delivered203D > 0 || allocated206A > 0) {
       addAllocationHistory({
         date,
         allocations: {
-          '203D': allocated203D,
+          '203D': delivered203D,
           '206A': allocated206A,
         },
       });
     }
 
-    // 203D 라우트 저장
-    if (allocated203D > 0) {
+    // 203D 라우트 저장 - ★ 실제 처리량 사용
+    if (delivered203D > 0) {
       const record203D: WorkRecord = {
         id: `${date}-203D-1-${Date.now()}`,
         date,
@@ -240,7 +247,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         round: 1,
         delivery: {
           ...delivery203D,
-          allocated: allocated203D,
+          allocated: delivered203D, // ★ 실제 처리량
           cancelled: undeliveredByRoute['203D'] || 0,
         },
         returns: returns,
