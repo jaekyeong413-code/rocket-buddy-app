@@ -88,6 +88,9 @@ export type FreshBagNotCollectedReason = 'absent' | 'hasProducts';
 // 반품 미회수 사유
 export type ReturnNotCollectedReason = 'absent' | 'customerNotReceived' | 'alreadyCollected' | 'cancelled';
 
+// 미배송 사유
+export type UndeliveredReason = 'cancelled' | 'wrongAddress' | 'doorClosed' | 'noAccessCode';
+
 // 프백 미회수 항목
 export interface FreshBagNotCollectedEntry {
   reason: FreshBagNotCollectedReason;
@@ -99,6 +102,14 @@ export interface FreshBagNotCollectedEntry {
 export interface ReturnNotCollectedEntry {
   route: '203D' | '206A';
   reason: ReturnNotCollectedReason;
+  quantity: number;
+  createdAt: string;
+}
+
+// 미배송 항목
+export interface UndeliveredEntry {
+  route: '203D' | '206A';
+  reason: UndeliveredReason;
   quantity: number;
   createdAt: string;
 }
@@ -136,6 +147,7 @@ export interface TodayWorkData {
   // 플로팅 메뉴 입력 (FAB)
   freshBagNotCollected?: FreshBagNotCollectedEntry[];  // 프백 미회수 목록
   returnNotCollected?: ReturnNotCollectedEntry[];      // 반품 미회수 목록
+  undelivered?: UndeliveredEntry[];                    // 미배송 목록
   numbered?: NumberedEntry[];                          // 채번 목록
 }
 

@@ -6,7 +6,6 @@ interface StageAProps {
   onFirstAllocationDeliveryChange: (value: string) => void;
   onFirstAllocationReturnsChange: (value: string) => void;
   onFreshBagChange: (data: TodayWorkData['freshBag']) => void;
-  ratio: { '203D': number; '206A': number };
 }
 
 export function StageA({
@@ -14,11 +13,8 @@ export function StageA({
   onFirstAllocationDeliveryChange,
   onFirstAllocationReturnsChange,
   onFreshBagChange,
-  ratio,
 }: StageAProps) {
   const freshBag = workData.freshBag;
-  const delivery203D = workData.routes['203D'];
-  const delivery206A = workData.routes['206A'];
 
   // 프레시백 총 할당
   const totalFBAllocated = (freshBag.regularAllocated || 0) + (freshBag.standaloneAllocated || 0);
@@ -107,10 +103,10 @@ export function StageA({
         </div>
       </div>
 
-      {/* 배송 1차 전체 물량 */}
-      <div className="bg-card rounded-2xl p-5 shadow-card border border-border/30">
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">
-          배송 1차 전체 물량
+      {/* 배송 1차 전체 물량 - 203D 1회전 할당으로 간주 */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-primary/30">
+        <label className="text-xs font-medium text-primary mb-2 block">
+          배송 1차 전체 물량 (= 203D 1회전 할당)
         </label>
         <input
           type="text"
@@ -118,23 +114,12 @@ export function StageA({
           pattern="[0-9]*"
           value={workData.firstAllocationDelivery || ''}
           onChange={(e) => onFirstAllocationDeliveryChange(e.target.value.replace(/\D/g, ''))}
-          placeholder="전체 배송 할당량 입력"
+          placeholder="203D 1회전 배송 할당량 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
         />
-
-        {/* 라우트별 분배 표시 */}
-        {workData.firstAllocationDelivery > 0 && (
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            <div className="p-3 rounded-xl bg-background border border-border/50 text-center">
-              <span className="text-xs text-muted-foreground">203D ({ratio['203D']}%)</span>
-              <div className="text-xl font-bold text-primary">{delivery203D.allocated}</div>
-            </div>
-            <div className="p-3 rounded-xl bg-background border border-border/50 text-center">
-              <span className="text-xs text-muted-foreground">206A ({ratio['206A']}%)</span>
-              <div className="text-xl font-bold text-primary">{delivery206A.allocated}</div>
-            </div>
-          </div>
-        )}
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          이 값이 203D 1회전 할당 물량으로 사용됩니다
+        </p>
       </div>
 
       {/* 반품 1차 전체 물량 */}

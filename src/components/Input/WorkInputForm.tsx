@@ -22,7 +22,6 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     addRecord, 
     records, 
     settings, 
-    getRouteRatio, 
     addAllocationHistory,
     getWorkData,
     updateWorkData,
@@ -32,7 +31,6 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   
   // 현재 입력 날짜 (store에서 관리 - 탭 이동해도 유지)
   const date = getCurrentInputDate();
-  const ratio = getRouteRatio();
 
   // 현재 날짜의 작업 데이터 (store에서 관리 - 탭 이동해도 유지)
   const workData = getWorkData(date);
@@ -66,18 +64,18 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     updateWorkData(date, { currentStage: stage });
   };
 
-  // Stage A 핸들러들
+  // Stage A 핸들러들 - 50% 분배 제거, 203D만 할당
   const handleFirstAllocationDeliveryChange = (value: string) => {
     const total = parseInt(value) || 0;
-    const suggested203D = total > 0 ? Math.round((total * ratio['203D']) / 100) : 0;
-    const suggested206A = total > 0 ? total - suggested203D : 0;
     
+    // Stage A: 배송 1차 전체 물량 = 203D 1회전 할당
+    // 206A는 Stage B에서 계산됨
     updateWorkData(date, {
       firstAllocationDelivery: total,
       routes: {
         ...workData.routes,
-        '203D': { ...delivery203D, allocated: suggested203D },
-        '206A': { ...delivery206A, allocated: suggested206A },
+        '203D': { ...delivery203D, allocated: total },
+        '206A': { ...delivery206A, allocated: 0 }, // Stage B에서 설정
       },
     });
   };
@@ -108,14 +106,16 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     
     // 클램프: 0 ~ totalRemaining 범위
     const clampedRemaining203D = Math.max(0, Math.min(remaining203D, totalRemaining));
-    const remaining206A = Math.max(0, totalRemaining - clampedRemaining203D);
+    
+    // 206A 1차 할당 = 전체 잔여 - 203D 잔여
+    const allocated206A = Math.max(0, totalRemaining - clampedRemaining203D);
     
     // SET 방식: 입력값으로 직접 대체 (누적 아님)
     updateWorkData(date, {
       routes: {
         ...workData.routes,
         '203D': { ...delivery203D, firstRoundRemaining: clampedRemaining203D },
-        '206A': { ...delivery206A, firstRoundRemaining: remaining206A },
+        '206A': { ...delivery206A, allocated: allocated206A, firstRoundRemaining: 0 },
       },
     });
   };
@@ -161,69 +161,52 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const todayRecords = records.filter(r => r.date === date);
   const currentInputAsRecords: WorkRecord[] = [];
   
-  // 2차 관련 필드
-  const round2Remaining = workData.round2TotalRemaining || 0;
-  const round1EndRemaining = workData.round1EndRemaining || 0;
-  const firstAllocDelivery = workData.firstAllocationDelivery || 0;
+  // 203D 할당 = Stage A 입력값
+  const allocated203D = workData.firstAllocationDelivery || 0;
+  // 206A 할당 = Stage B에서 계산 (전체잔여 - 203D잔여)
+  const totalRemaining = workData.totalRemainingAfterFirstRound || 0;
+  const remaining203D = delivery203D.firstRoundRemaining || 0;
+  const allocated206A = delivery206A.allocated || 0;
   
-  // 모든 단계(A~F)의 입력을 포함하여 레코드 생성 여부 결정
-  const hasAnyDeliveryInput = 
-    firstAllocDelivery > 0 ||
-    (workData.totalRemainingAfterFirstRound || 0) > 0 ||
-    round1EndRemaining > 0 ||
-    round2Remaining > 0 ||
-    (workData.round2EndRemaining || 0) > 0;
+  // 미배송 수량 계산 (수입 차감용)
+  const undeliveredByRoute = (workData.undelivered || []).reduce((acc, entry) => {
+    acc[entry.route] = (acc[entry.route] || 0) + entry.quantity;
+    return acc;
+  }, {} as Record<string, number>);
   
-  const has203DData = hasAnyDeliveryInput ||
-                      (delivery203D.allocated || 0) > 0 || 
-                      (delivery203D.firstRoundRemaining || 0) > 0 || 
-                      (delivery203D.completed || 0) > 0;
-  const has206AData = hasAnyDeliveryInput ||
-                      (delivery206A.allocated || 0) > 0 || 
-                      (delivery206A.firstRoundRemaining || 0) > 0 || 
-                      (delivery206A.completed || 0) > 0;
+  const has203DData = allocated203D > 0;
+  const has206AData = allocated206A > 0;
   
-  // 2차 데이터를 포함한 DeliveryData 생성 (계산 로직이 읽을 수 있도록)
-  // 중요: firstRoundRemaining은 사용자가 입력한 값 그대로 유지 (set, not +=)
-  // 2차 잔여물량은 별도 필드로 계산에 전달 (누적하지 않음)
-  const createEnhancedDelivery = (baseDelivery: typeof delivery203D, ratio: number): typeof delivery203D => {
-    const allocated = (baseDelivery.allocated || 0) > 0 
-      ? baseDelivery.allocated 
-      : Math.round(firstAllocDelivery * ratio);
-    
-    // 사용자 입력 firstRoundRemaining을 그대로 사용 (2차 물량과 누적하지 않음)
-    const userInputRemaining = baseDelivery.firstRoundRemaining ?? 0;
-    
-    return {
-      ...baseDelivery,
-      allocated,
-      // SET 방식: 사용자 입력값만 사용, 누적 없음
-      firstRoundRemaining: userInputRemaining,
-    };
-  };
-  
-  const ratio203D = 0.5;
-  const ratio206A = 0.5;
-  
+  // 203D 레코드 생성
   if (has203DData) {
     currentInputAsRecords.push({
       id: 'temp-203d',
       date,
       route: '203D',
       round: 1,
-      delivery: createEnhancedDelivery(delivery203D, ratio203D),
+      delivery: {
+        ...delivery203D,
+        allocated: allocated203D,
+        // 미배송은 물량 변경 없음, cancelled로 처리하여 수입에서 차감
+        cancelled: undeliveredByRoute['203D'] || 0,
+      },
       returns,
       freshBag,
     });
   }
   
+  // 206A 레코드 생성
   if (has206AData) {
     currentInputAsRecords.push({
       id: 'temp-206a',
       date,
       route: '206A',
       round: 1,
-      delivery: createEnhancedDelivery(delivery206A, ratio206A),
+      delivery: {
+        ...delivery206A,
+        allocated: allocated206A,
+        cancelled: undeliveredByRoute['206A'] || 0,
+      },
       returns: createDefaultReturnsData(),
       freshBag: createDefaultFreshBagData(),
     });
@@ -238,24 +221,28 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
 
   const handleSubmit = () => {
     // 할당량 학습 데이터 저장
-    if (delivery203D.allocated > 0 || delivery206A.allocated > 0) {
+    if (allocated203D > 0 || allocated206A > 0) {
       addAllocationHistory({
         date,
         allocations: {
-          '203D': delivery203D.allocated,
-          '206A': delivery206A.allocated,
+          '203D': allocated203D,
+          '206A': allocated206A,
         },
       });
     }
 
     // 203D 라우트 저장
-    if (delivery203D.allocated > 0 || delivery203D.completed > 0) {
+    if (allocated203D > 0) {
       const record203D: WorkRecord = {
         id: `${date}-203D-1-${Date.now()}`,
         date,
         route: '203D',
         round: 1,
-        delivery: delivery203D,
+        delivery: {
+          ...delivery203D,
+          allocated: allocated203D,
+          cancelled: undeliveredByRoute['203D'] || 0,
+        },
         returns: returns,
         freshBag: freshBag,
       };
@@ -263,13 +250,17 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     }
 
     // 206A 라우트 저장
-    if (delivery206A.allocated > 0 || delivery206A.completed > 0) {
+    if (allocated206A > 0) {
       const record206A: WorkRecord = {
         id: `${date}-206A-1-${Date.now() + 1}`,
         date,
         route: '206A',
         round: 1,
-        delivery: delivery206A,
+        delivery: {
+          ...delivery206A,
+          allocated: allocated206A,
+          cancelled: undeliveredByRoute['206A'] || 0,
+        },
         returns: createDefaultReturnsData(),
         freshBag: createDefaultFreshBagData(),
       };
@@ -290,7 +281,6 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             onFirstAllocationDeliveryChange={handleFirstAllocationDeliveryChange}
             onFirstAllocationReturnsChange={handleFirstAllocationReturnsChange}
             onFreshBagChange={handleFreshBagChange}
-            ratio={ratio}
           />
         );
       case 'B':
