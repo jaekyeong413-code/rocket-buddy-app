@@ -178,15 +178,20 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
                       (delivery206A.completed || 0) > 0;
   
   // 2차 데이터를 포함한 DeliveryData 생성 (계산 로직이 읽을 수 있도록)
+  // 주의: firstRoundRemaining은 사용자가 입력한 값 그대로 유지 (set, not +=)
+  // additionalRemaining은 별도로 계산하여 합산
   const createEnhancedDelivery = (baseDelivery: typeof delivery203D, ratio: number): typeof delivery203D => {
     const allocated = (baseDelivery.allocated || 0) > 0 
       ? baseDelivery.allocated 
       : Math.round(firstAllocDelivery * ratio);
+    // 2차 잔여물량은 사용자 입력값에 추가하지 않고 별도로 계산
     const additionalRemaining = Math.round((round2Remaining + round1EndRemaining) * ratio);
+    // 사용자 입력 firstRoundRemaining + 계산된 추가분
+    const userInputRemaining = baseDelivery.firstRoundRemaining || 0;
     return {
       ...baseDelivery,
       allocated,
-      firstRoundRemaining: (baseDelivery.firstRoundRemaining || 0) + additionalRemaining,
+      firstRoundRemaining: userInputRemaining + additionalRemaining,
     };
   };
   
