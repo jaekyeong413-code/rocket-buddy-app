@@ -83,10 +83,32 @@ export function TodayIncomeCard() {
   const freshBag = todayWorkData.freshBag;
   const returns = todayWorkData.returns;
   
-  // 203D 할당 = Stage A 입력값 (firstAllocationDelivery)
-  const allocated203D = todayWorkData.firstAllocationDelivery || 0;
-  // 206A 할당 = Stage B에서 계산됨 (routes['206A'].allocated)
-  const allocated206A = delivery206A.allocated || 0;
+  // ★ Stage A: 배송 1차 전체 물량 (= 203D 1회전 할당)
+  const firstAllocation = todayWorkData.firstAllocationDelivery || 0;
+  
+  // ★ Stage B: 1회전 현재 '전체 잔여 물량' (= 203D 종료 후 남은 전체)
+  const totalRemaining = todayWorkData.totalRemainingAfterFirstRound || 0;
+  
+  // ★ Stage B: 203D 잔여 물량 (입력 안 하면 기본값 0)
+  const remaining203D = delivery203D.firstRoundRemaining || 0;
+  
+  // ★ 핵심 계산 (Stage B 결과 반영)
+  // 203D 실제 처리량 = firstAllocation - totalRemaining
+  // 설명: 203D 1회전에서 처리한 양 = 시작 물량 - 종료 시점 전체 잔여
+  const delivered203D = Math.max(0, firstAllocation - totalRemaining);
+  
+  // 206A 할당 = totalRemaining - remaining203D
+  // 설명: 전체 잔여에서 203D에 남길 물량을 빼면 206A로 넘어가는 물량
+  const allocated206A = Math.max(0, totalRemaining - remaining203D);
+  
+  // 디버그 로그 (수입 계산 확인용)
+  console.log('[TodayIncomeCard] Stage 계산:', {
+    'Stage A - firstAllocation (203D 1회전 할당)': firstAllocation,
+    'Stage B - totalRemaining (전체 잔여)': totalRemaining,
+    'Stage B - remaining203D (203D 잔여)': remaining203D,
+    '→ delivered203D (203D 처리량)': delivered203D,
+    '→ allocated206A (206A 할당)': allocated206A,
+  });
   
   // 미배송 수량 계산 (수입 차감용)
   const undeliveredByRoute = (todayWorkData.undelivered || []).reduce((acc, entry) => {
@@ -94,7 +116,7 @@ export function TodayIncomeCard() {
     return acc;
   }, {} as Record<string, number>);
   
-  const has203DData = allocated203D > 0;
+  const has203DData = delivered203D > 0;
   const has206AData = allocated206A > 0;
   
   if (has203DData) {
@@ -105,7 +127,7 @@ export function TodayIncomeCard() {
       round: 1,
       delivery: {
         ...delivery203D,
-        allocated: allocated203D,
+        allocated: delivered203D, // ★ 할당이 아니라 실제 처리량
         cancelled: undeliveredByRoute['203D'] || 0,
       },
       returns,
