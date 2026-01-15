@@ -15,13 +15,20 @@ export function StageB({
 }: StageBProps) {
   const freshBag = workData.freshBag;
   const delivery203D = workData.routes['203D'];
+  
+  // Stage B 값들
+  const totalRemaining = workData.totalRemainingAfterFirstRound ?? 0;
+  const remaining203D = delivery203D.firstRoundRemaining ?? 0;
+  
+  // 206A 1차 할당 = 전체 잔여 - 203D 잔여
+  const allocated206A = Math.max(0, totalRemaining - remaining203D);
 
   return (
     <div className="space-y-4 animate-slide-up">
       {/* 단계 설명 */}
       <div className="bg-primary/10 rounded-xl p-3 border border-primary/20">
         <p className="text-sm font-medium text-primary text-center">
-          203D 종료 직후 상태 입력 (전체 잔여와 203D 잔여를 그대로 입력)
+          203D 1회전 종료 직후 상태 입력
         </p>
       </div>
 
@@ -34,7 +41,7 @@ export function StageB({
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={workData.totalRemainingAfterFirstRound !== undefined && workData.totalRemainingAfterFirstRound !== null ? String(workData.totalRemainingAfterFirstRound) : ''}
+          value={totalRemaining !== 0 ? String(totalRemaining) : (workData.totalRemainingAfterFirstRound !== undefined ? String(workData.totalRemainingAfterFirstRound) : '')}
           onChange={(e) => onTotalRemainingChange(e.target.value.replace(/\D/g, ''))}
           placeholder="전체 잔여 물량 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
@@ -50,21 +57,27 @@ export function StageB({
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={delivery203D.firstRoundRemaining !== undefined && delivery203D.firstRoundRemaining !== null ? String(delivery203D.firstRoundRemaining) : ''}
+          value={remaining203D !== 0 ? String(remaining203D) : (delivery203D.firstRoundRemaining !== undefined ? String(delivery203D.firstRoundRemaining) : '')}
           onChange={(e) => on203DRemainingChange(e.target.value.replace(/\D/g, ''))}
-          placeholder="203D 잔여 입력"
+          placeholder="203D 잔여 입력 (기본값: 0)"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-primary/10 rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
         />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          입력하지 않으면 기본값 0 (203D에 남길 물량 없음)
+        </p>
 
-        {/* 206A 자동 계산 표시 */}
-        {(workData.totalRemainingAfterFirstRound || 0) > 0 && (
-          <div className="mt-3 p-3 bg-muted rounded-xl">
+        {/* 206A 1차 할당 자동 계산 표시 */}
+        {totalRemaining > 0 && (
+          <div className="mt-3 p-3 bg-success/10 rounded-xl border border-success/20">
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">206A 잔여 (자동계산)</span>
-              <span className="text-lg font-bold text-primary">
-                {Math.max(0, (workData.totalRemainingAfterFirstRound || 0) - (delivery203D.firstRoundRemaining || 0))}
+              <span className="text-xs text-success font-medium">206A 1차 할당 (자동계산)</span>
+              <span className="text-lg font-bold text-success">
+                {allocated206A}
               </span>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              = 전체잔여({totalRemaining}) - 203D잔여({remaining203D})
+            </p>
           </div>
         )}
       </div>

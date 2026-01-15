@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, X, Package, RefreshCcw, Hash } from 'lucide-react';
+import { Plus, X, Package, RefreshCcw, Hash, Truck } from 'lucide-react';
 import { FreshBagNotCollectedSheet } from './FreshBagNotCollectedSheet';
 import { ReturnNotCollectedSheet } from './ReturnNotCollectedSheet';
+import { UndeliveredSheet } from './UndeliveredSheet';
 import { NumberedSheet } from './NumberedSheet';
 
-type SheetType = 'freshBag' | 'return' | 'numbered' | null;
+type SheetType = 'freshBag' | 'return' | 'undelivered' | 'numbered' | null;
 
 export function QuickActionFAB() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -49,6 +50,11 @@ export function QuickActionFAB() {
       id: 'return' as const,
       label: '반품 미회수',
       icon: RefreshCcw,
+    },
+    {
+      id: 'undelivered' as const,
+      label: '미배송',
+      icon: Truck,
     },
     {
       id: 'numbered' as const,
@@ -139,6 +145,10 @@ export function QuickActionFAB() {
       />
       <ReturnNotCollectedSheet
         isOpen={activeSheet === 'return'}
+        onClose={() => setActiveSheet(null)}
+      />
+      <UndeliveredSheet
+        isOpen={activeSheet === 'undelivered'}
         onClose={() => setActiveSheet(null)}
       />
       <NumberedSheet
