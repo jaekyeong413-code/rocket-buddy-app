@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner';
 import { StageIndicator, StageKey } from './StageIndicator';
 import { StageA, StageB, StageC, StageD, StageE, StageF } from './stages';
+import { QuickActionFAB } from './FAB';
 
 
 export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
@@ -216,7 +217,12 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     });
   }
 
-  const estimatedIncome = calculateDailyIncome([...todayRecords, ...currentInputAsRecords], settings);
+  // 채번 수입 계산 (라우트별 단가 적용)
+  const numberedIncome = (workData.numbered || []).reduce((sum, entry) => {
+    return sum + (settings.routes[entry.route] * entry.quantity);
+  }, 0);
+
+  const estimatedIncome = calculateDailyIncome([...todayRecords, ...currentInputAsRecords], settings) + numberedIncome;
 
   const handleSubmit = () => {
     // 할당량 학습 데이터 저장
@@ -398,6 +404,9 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
           다음 단계로 →
         </Button>
       )}
+
+      {/* FAB - 플로팅 액션 버튼 */}
+      <QuickActionFAB />
     </div>
   );
 }

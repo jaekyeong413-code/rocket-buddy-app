@@ -82,6 +82,34 @@ export interface WorkRecord {
   freshBag: FreshBagData;
 }
 
+// 프백 미회수 사유
+export type FreshBagNotCollectedReason = 'absent' | 'hasProducts';
+
+// 반품 미회수 사유
+export type ReturnNotCollectedReason = 'absent' | 'customerNotReceived' | 'alreadyCollected' | 'cancelled';
+
+// 프백 미회수 항목
+export interface FreshBagNotCollectedEntry {
+  reason: FreshBagNotCollectedReason;
+  quantity: number;
+  createdAt: string;
+}
+
+// 반품 미회수 항목
+export interface ReturnNotCollectedEntry {
+  route: '203D' | '206A';
+  reason: ReturnNotCollectedReason;
+  quantity: number;
+  createdAt: string;
+}
+
+// 채번 항목
+export interface NumberedEntry {
+  route: '203D' | '206A';
+  quantity: number;
+  createdAt: string;
+}
+
 // 오늘의 작업 데이터 (저장 전 상태 - 항상 표시)
 export interface TodayWorkData {
   date: string;
@@ -104,6 +132,11 @@ export interface TodayWorkData {
   round2TotalReturns?: number;          // Stage D: 2회전 전체 반품
   round2EndRemaining?: number;          // Stage E: 2회전 종료 잔여
   round2EndReturnsRemaining?: number;   // Stage E: 2회전 종료 반품 잔여
+  
+  // 플로팅 메뉴 입력 (FAB)
+  freshBagNotCollected?: FreshBagNotCollectedEntry[];  // 프백 미회수 목록
+  returnNotCollected?: ReturnNotCollectedEntry[];      // 반품 미회수 목록
+  numbered?: NumberedEntry[];                          // 채번 목록
 }
 
 export interface DailyStats {

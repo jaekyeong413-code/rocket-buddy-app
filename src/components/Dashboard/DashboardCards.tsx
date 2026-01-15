@@ -157,7 +157,13 @@ export function TodayIncomeCard() {
 
   // 저장된 기록 + 현재 입력 중인 데이터 합산
   const allTodayRecords = [...savedTodayRecords, ...currentInputAsRecords];
-  const todayIncome = calculateDailyIncome(allTodayRecords, settings);
+  
+  // 채번 수입 계산 (라우트별 단가 적용)
+  const numberedIncome = (todayWorkData.numbered || []).reduce((sum, entry) => {
+    return sum + (settings.routes[entry.route] * entry.quantity);
+  }, 0);
+  
+  const todayIncome = calculateDailyIncome(allTodayRecords, settings) + numberedIncome;
   const details = calculateDailyIncomeDetails(allTodayRecords, settings);
 
   return (
