@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 
 interface RecordItemProps {
@@ -58,7 +58,7 @@ function RecordItem({ record, onEdit, onDelete, routeRate, fbRates }: RecordItem
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                toast.info('수정 기능은 곧 추가됩니다');
+                toast({ title: '수정 기능은 곧 추가됩니다' });
               }}
               className="p-2 rounded-lg hover:bg-muted transition-colors"
             >
@@ -240,7 +240,7 @@ export function RecordsList({ onEdit }: { onEdit: (record: WorkRecord) => void }
     const fileName = `퀵플렉스_기록_${filterType}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
     
-    toast.success('엑셀 파일이 다운로드되었습니다');
+    toast({ title: '엑셀 파일이 다운로드되었습니다' });
   };
 
   return (

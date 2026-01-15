@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { useStore } from '@/store/useStore';
-import { formatDate } from '@/lib/calculations';
 import { FreshBagNotCollectedReason } from '@/types';
 import { QuantityStepper } from './QuantityStepper';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 interface FreshBagNotCollectedSheetProps {
   isOpen: boolean;
@@ -48,7 +47,7 @@ export function FreshBagNotCollectedSheet({ isOpen, onClose }: FreshBagNotCollec
       freshBag,
     });
     
-    toast.success(`프백 미회수 ${quantity}건 저장`);
+    toast({ title: `프백 미회수 ${quantity}건 저장` });
     
     // 초기화 및 닫기
     setSelectedReason('absent');

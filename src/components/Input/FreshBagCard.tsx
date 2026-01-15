@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Minus, ChevronDown, ChevronUp, Package, Save, UserX, PackageX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FreshBagData } from '@/types';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 interface NumberFieldProps {
   label: string;
@@ -36,7 +36,7 @@ function NumberField({ label, value, onChange, type = 'default', showSave = true
         {showSave && (
           <button
             type="button"
-            onClick={() => toast.success('임시 저장됨')}
+            onClick={() => toast({ title: '임시 저장됨' })}
             className="p-1 rounded hover:bg-background/50 transition-colors"
           >
             <Save className="w-3 h-3 text-muted-foreground" />
