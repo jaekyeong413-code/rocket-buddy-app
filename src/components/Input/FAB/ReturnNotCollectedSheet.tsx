@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useStore } from '@/store/useStore';
 import { ReturnNotCollectedReason } from '@/types';
 import { QuantityStepper } from './QuantityStepper';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 interface ReturnNotCollectedSheetProps {
   isOpen: boolean;
@@ -58,7 +58,7 @@ export function ReturnNotCollectedSheet({ isOpen, onClose }: ReturnNotCollectedS
     const rateMessage = selectedReason === 'absent' 
       ? '(회수율 차감 없음)' 
       : '(회수율 차감)';
-    toast.success(`반품 미회수 ${quantity}건 저장 ${rateMessage}`);
+    toast({ title: `반품 미회수 ${quantity}건 저장 ${rateMessage}` });
     
     // 초기화 및 닫기
     setSelectedRoute('203D');

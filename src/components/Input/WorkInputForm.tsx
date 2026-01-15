@@ -11,7 +11,7 @@ import {
   calculateDailyIncome,
   formatCurrency,
 } from '@/lib/calculations';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 import { StageIndicator, StageKey } from './StageIndicator';
 import { StageA, StageB, StageC, StageD, StageE, StageF } from './stages';
 import { QuickActionFAB } from './FAB';
@@ -264,7 +264,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
       addRecord(record206A);
     }
 
-    toast.success('작업 기록이 저장되었습니다!');
+    toast({ title: '작업 기록이 저장되었습니다!' });
     onComplete?.();
   };
 

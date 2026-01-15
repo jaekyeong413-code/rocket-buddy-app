@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Minus, ChevronDown, ChevronUp, Award, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RouteType, DeliveryData } from '@/types';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 interface NumberFieldProps {
   label: string;
@@ -25,7 +25,7 @@ function NumberField({ label, value, onChange, type = 'default' }: NumberFieldPr
   };
 
   const handleTempSave = () => {
-    toast.success('임시 저장됨');
+    toast({ title: '임시 저장됨' });
   };
 
   return (

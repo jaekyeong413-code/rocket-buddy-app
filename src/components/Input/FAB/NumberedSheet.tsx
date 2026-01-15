@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useStore } from '@/store/useStore';
 import { QuantityStepper } from './QuantityStepper';
 import { formatCurrency } from '@/lib/calculations';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 interface NumberedSheetProps {
   isOpen: boolean;
@@ -44,7 +44,7 @@ export function NumberedSheet({ isOpen, onClose }: NumberedSheetProps) {
       returns,
     });
     
-    toast.success(`채번 ${quantity}건 저장 (+${formatCurrency(estimatedIncome)})`);
+    toast({ title: `채번 ${quantity}건 저장 (+${formatCurrency(estimatedIncome)})` });
     
     // 초기화 및 닫기
     setSelectedRoute('203D');
