@@ -278,12 +278,19 @@ export function TodayFBStatus() {
   // 현재 입력 중인 프레시백 데이터
   const freshBag = todayWorkData.freshBag;
   
-  // 진행률용 회수율 (전체 기준)
-  const totalAllocated = (freshBag.regularAllocated || 0) + (freshBag.standaloneAllocated || 0) 
-                         + (freshBag.regularAdjustment || 0) 
-                         - (freshBag.transferred || 0) + (freshBag.added || 0);
-  const totalFailed = (freshBag.failedAbsent || 0) + (freshBag.failedWithProducts || 0);
-  const progressRate = totalAllocated > 0 ? ((totalAllocated - totalFailed) / totalAllocated) * 100 : 0;
+  // 프레시백 시작 = 할당 + 조정 - 이관 + 추가
+  const freshbagStart = (freshBag.regularAllocated || 0) + (freshBag.standaloneAllocated || 0) 
+                        + (freshBag.regularAdjustment || 0) 
+                        - (freshBag.transferred || 0) + (freshBag.added || 0);
+  
+  // 미방문 합계 (Stage F 입력값)
+  const totalUndone = (freshBag.undoneLinked || 0) + (freshBag.undoneSolo || 0);
+  
+  // 완료 = 시작 - 미방문 (음수 방지)
+  const freshbagCompleted = Math.max(0, freshbagStart - totalUndone);
+  
+  // 진행률 = 완료 / 시작
+  const progressRate = freshbagStart > 0 ? (freshbagCompleted / freshbagStart) * 100 : 0;
   
   // 평가용 단독 회수율
   const standaloneAllocated = Math.max(0, (freshBag.standaloneAllocated || 0) - (freshBag.regularAdjustment || 0));
@@ -376,9 +383,18 @@ export function TodayFBStatus() {
         </div>
       </div>
       
-      {/* 미회수 사유 표시 */}
-      {totalFailed > 0 && (
-        <div className="mt-4 p-3 bg-destructive/10 rounded-xl">
+      {/* 미방문 표시 */}
+      {totalUndone > 0 && (
+        <div className="mt-4 p-3 bg-warning/10 rounded-xl">
+          <div className="text-xs text-warning font-medium">
+            미방문: 일반(연계) {freshBag.undoneLinked || 0}건, 단독 {freshBag.undoneSolo || 0}건
+          </div>
+        </div>
+      )}
+      
+      {/* 미회수 사유 표시 (failedAbsent, failedWithProducts) */}
+      {((freshBag.failedAbsent || 0) + (freshBag.failedWithProducts || 0)) > 0 && (
+        <div className="mt-2 p-3 bg-destructive/10 rounded-xl">
           <div className="text-xs text-destructive font-medium">
             확인 완료 (단가 미지급): 부재 {freshBag.failedAbsent || 0}건, 상품 남아 있음 {freshBag.failedWithProducts || 0}건
           </div>
