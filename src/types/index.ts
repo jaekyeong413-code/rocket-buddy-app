@@ -60,9 +60,9 @@ export interface FreshBagData {
   // 2회전 미확인 (Stage E)
   round2FailedAbsent?: number;
 
-  // 최종 완료 (Stage F)
-  finalRegularCompleted?: number;
-  finalStandaloneCompleted?: number;
+  // 최종 미방문 (Stage F) - 방문 못한/남은 프레시백 수
+  undoneLinked?: number;      // 일반(연계) 미방문
+  undoneSolo?: number;        // 단독 미방문
 
   // 미회수 (회수율 인정, 단가 미지급)
   failedAbsent: number;        // 부재

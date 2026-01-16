@@ -56,15 +56,20 @@ export function calculateActualReturns(record: WorkRecord): number {
   return Math.max(0, allocated - notCollected);
 }
 
-// 실제 FB 회수 수량 계산 (전체 할당 - 미회수 = 완료)
+// 실제 FB 회수 수량 계산 (시작 - 미방문 = 완료)
 export function calculateActualFreshBags(record: WorkRecord): number {
-  const totalAllocated = (record.freshBag.regularAllocated || 0) + 
-                         (record.freshBag.standaloneAllocated || 0) +
-                         (record.freshBag.regularAdjustment || 0) -
-                         (record.freshBag.transferred || 0) +
-                         (record.freshBag.added || 0);
-  const totalFailed = (record.freshBag.failedAbsent || 0) + (record.freshBag.failedNoProduct || 0);
-  return Math.max(0, totalAllocated - totalFailed);
+  // 프레시백 시작 = 할당 + 조정 - 이관 + 추가
+  const freshbagStart = (record.freshBag.regularAllocated || 0) + 
+                        (record.freshBag.standaloneAllocated || 0) +
+                        (record.freshBag.regularAdjustment || 0) -
+                        (record.freshBag.transferred || 0) +
+                        (record.freshBag.added || 0);
+  
+  // 미방문 합계 (Stage F 입력값)
+  const totalUndone = (record.freshBag.undoneLinked || 0) + (record.freshBag.undoneSolo || 0);
+  
+  // 완료 = 시작 - 미방문 (음수 방지)
+  return Math.max(0, freshbagStart - totalUndone);
 }
 
 // 배송 진행률 계산 (완료 입력값 기준)
@@ -95,55 +100,61 @@ export function calculateReturnsProgress(records: WorkRecord[]): { completed: nu
   return { completed, total: Math.max(total, completed) };
 }
 
-// FB 진행률 계산 (전체 할당 - 미회수 = 완료)
+// FB 진행률 계산 (시작 - 미방문 = 완료)
 export function calculateFBProgress(records: WorkRecord[]): { completed: number; total: number } {
   let completed = 0;
   let total = 0;
   
   for (const record of records) {
-    const fbAllocated = (record.freshBag.regularAllocated || 0) + (record.freshBag.standaloneAllocated || 0) 
-                        + (record.freshBag.regularAdjustment || 0)
-                        - (record.freshBag.transferred || 0) + (record.freshBag.added || 0);
-const totalFailed =
-  (record.freshBag.failedAbsent || 0) +
-  (record.freshBag.failedNoProduct || 0) +
-  (record.freshBag.failedWithProducts || 0);
-    total += fbAllocated;
-    completed += Math.max(0, fbAllocated - totalFailed);
+    // 프레시백 시작
+    const fbStart = (record.freshBag.regularAllocated || 0) + (record.freshBag.standaloneAllocated || 0) 
+                    + (record.freshBag.regularAdjustment || 0)
+                    - (record.freshBag.transferred || 0) + (record.freshBag.added || 0);
+    
+    // 미방문 합계
+    const totalUndone = (record.freshBag.undoneLinked || 0) + (record.freshBag.undoneSolo || 0);
+    
+    total += fbStart;
+    completed += Math.max(0, fbStart - totalUndone);
   }
   
   return { completed, total: Math.max(total, completed) };
 }
 
-// 오늘 기준 일반 FB 회수율
+// 오늘 기준 일반 FB 회수율 (시작 - 미방문 = 완료)
 export function calculateTodayRegularFBRate(records: WorkRecord[]): number {
-  let collected = 0;
+  let completed = 0;
   let total = 0;
 
   for (const record of records) {
-    const regularAllocated = (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0);
-    const regularFailed = (record.freshBag.failedAbsent || 0) + (record.freshBag.failedNoProduct || 0);
-    collected += Math.max(0, regularAllocated - regularFailed);
-    total += regularAllocated;
+    // 일반 시작 = 할당 + 조정
+    const regularStart = (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0);
+    // 일반 미방문
+    const regularUndone = record.freshBag.undoneLinked || 0;
+    total += regularStart;
+    completed += Math.max(0, regularStart - regularUndone);
   }
 
   if (total === 0) return 0;
-  return (collected / total) * 100;
+  return (completed / total) * 100;
 }
 
-// 오늘 기준 단독 FB 회수율
+// 오늘 기준 단독 FB 회수율 (시작 - 미방문 = 완료)
 export function calculateTodayStandaloneFBRate(records: WorkRecord[]): number {
-  let collected = 0;
+  let completed = 0;
   let total = 0;
 
   for (const record of records) {
-    const standaloneAllocated = (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0);
-    total += Math.max(0, standaloneAllocated);
-    collected += Math.max(0, standaloneAllocated); // 단독은 미회수 사유가 별도로 없음
+    // 단독 시작 = 할당 - 조정 (일반으로 전환된 만큼 제외)
+    const standaloneStart = Math.max(0, (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0));
+    // 단독 미방문
+    const standaloneUndone = record.freshBag.undoneSolo || 0;
+    total += standaloneStart;
+    completed += Math.max(0, standaloneStart - standaloneUndone);
   }
 
   if (total === 0) return 0;
-  return (collected / total) * 100;
+  return (completed / total) * 100;
 }
 
 // 일일 수입 계산
@@ -268,24 +279,27 @@ export function calculateFBCollectionRate(
   records: WorkRecord[],
   type: 'regular' | 'standalone'
 ): number {
-  let collected = 0;
+  let completed = 0;
   let total = 0;
 
   for (const record of records) {
     if (type === 'regular') {
-      const regularAllocated = (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0);
-      const regularFailed = (record.freshBag.failedAbsent || 0) + (record.freshBag.failedNoProduct || 0);
-      total += regularAllocated;
-      collected += Math.max(0, regularAllocated - regularFailed);
+      // 일반 시작 = 할당 + 조정
+      const regularStart = (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0);
+      const regularUndone = record.freshBag.undoneLinked || 0;
+      total += regularStart;
+      completed += Math.max(0, regularStart - regularUndone);
     } else {
-      const standaloneAllocated = Math.max(0, (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0));
-      total += standaloneAllocated;
-      collected += standaloneAllocated;
+      // 단독 시작 = 할당 - 조정
+      const standaloneStart = Math.max(0, (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0));
+      const standaloneUndone = record.freshBag.undoneSolo || 0;
+      total += standaloneStart;
+      completed += Math.max(0, standaloneStart - standaloneUndone);
     }
   }
 
   if (total === 0) return 0;
-  return (collected / total) * 100;
+  return (completed / total) * 100;
 }
 
 export function calculatePeriodSummary(
