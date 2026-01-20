@@ -1,5 +1,16 @@
-import { Settings, WorkRecord, PeriodSummary, WeeklyStats, FreshBagData, DeliveryData, ReturnsData } from '@/types';
+import { Settings, WorkRecord, PeriodSummary, WeeklyStats, FreshBagData, DeliveryData, ReturnsData, TodayWorkData } from '@/types';
 
+// ================================
+// 고정 단가 (참조용 - settings에서 가져옴)
+// ================================
+// 203D 기본단가 = 850원
+// 206A 기본단가 = 750원
+// 프레시백 일반 = 100원
+// 프레시백 단독 = 200원
+
+// ================================
+// 정산 기간 (26일 ~ 익월 25일)
+// ================================
 export function getCurrentPeriod(): { startDate: string; endDate: string } {
   const today = new Date();
   const currentDay = today.getDate();
@@ -31,6 +42,247 @@ export function parseDate(dateString: string): Date {
   return new Date(dateString);
 }
 
+// ================================
+// Plan/Loss/Extra 기반 수입 계산
+// ================================
+// 핵심 원칙:
+// - Plan: 완료로 간주되는 계획치 (할당 = 완료)
+// - Loss: 미배송/미회수/미방문으로 인한 차감
+// - Extra: 채번으로 인한 추가 수입
+// - 예상 수입 = (Plan − Loss) + Extra + 인센티브
+
+// ================================
+// 오늘 예상 수입 계산 (TodayWorkData 기반 - Plan/Loss/Extra)
+// ================================
+export interface TodayIncomeBreakdown {
+  // 기프트(배송) 수입
+  giftPlan203D: number;
+  giftPlan206A: number;
+  giftLoss203D: number;  // 미배송
+  giftLoss206A: number;  // 미배송
+  giftIncome: number;
+  
+  // 반품 수입
+  returnPlan203D: number;
+  returnPlan206A: number;
+  returnLoss203D: number;  // 미회수
+  returnLoss206A: number;  // 미회수
+  returnIncome: number;
+  
+  // 프레시백 수입
+  fbPlanGeneral: number;
+  fbPlanSolo: number;
+  fbLossGeneral: number;  // 미방문
+  fbLossSolo: number;     // 미방문
+  fbIncome: number;
+  
+  // 채번 (Extra)
+  chaebeon203D: number;
+  chaebeon206A: number;
+  chaebeonIncome: number;
+  
+  // 인센티브
+  regularFBRate: number;
+  standaloneFBRate: number;
+  regularIncentive: number;
+  standaloneIncentive: number;
+  
+  // 최종 합계
+  totalIncome: number;
+  
+  // 상태 정보
+  status: 'complete' | 'partial' | 'incomplete';
+  statusMessage?: string;
+}
+
+export function calculateTodayIncome(
+  workData: TodayWorkData,
+  settings: Settings
+): TodayIncomeBreakdown {
+  const rate203D = settings.routes['203D'];  // 850원
+  const rate206A = settings.routes['206A'];  // 750원
+  const fbRegularRate = settings.freshBag.regular;    // 100원
+  const fbStandaloneRate = settings.freshBag.standalone; // 200원
+
+  // ================================
+  // 1. 기프트(배송) 수입 계산
+  // ================================
+  // Plan: Stage A → firstAllocationDelivery = 203D 1회전 할당
+  // Stage B → 203D 처리량 = firstAllocation - totalRemaining
+  // Stage B → 206A 할당 = totalRemaining - remaining203D
+  
+  const firstAllocation = workData.firstAllocationDelivery || 0;
+  const totalRemaining = workData.totalRemainingAfterFirstRound || 0;
+  const remaining203D = workData.routes['203D'].firstRoundRemaining || 0;
+  
+  // 203D 처리량 (Plan) = 시작 - 종료 시점 전체 잔여
+  const giftPlan203D = Math.max(0, firstAllocation - totalRemaining);
+  // 206A 할당 (Plan) = 전체 잔여 - 203D 잔여
+  const giftPlan206A = Math.max(0, totalRemaining - remaining203D);
+  
+  // Loss: 미배송 (플로팅 입력)
+  const undeliveredEntries = workData.undelivered || [];
+  const giftLoss203D = undeliveredEntries
+    .filter(e => e.route === '203D')
+    .reduce((sum, e) => sum + e.quantity, 0);
+  const giftLoss206A = undeliveredEntries
+    .filter(e => e.route === '206A')
+    .reduce((sum, e) => sum + e.quantity, 0);
+  
+  // 기프트 수입 = (Plan - Loss) * 단가
+  const giftIncome = 
+    ((giftPlan203D - giftLoss203D) * rate203D) +
+    ((giftPlan206A - giftLoss206A) * rate206A);
+
+  // ================================
+  // 2. 반품 수입 계산
+  // ================================
+  // Plan: 반품 할당 = 회수 지시 = 완료로 간주
+  // 반품은 라우트 구분이 필요하지만 현재 구조상 통합 입력
+  // TODO: 라우트별 반품 할당이 필요하면 추가
+  
+  const returnAllocated = workData.returns?.allocated || 0;
+  // 현재 구조에서는 반품 할당의 라우트 분해가 안 됨
+  // 임의 분할 금지 원칙에 따라, 라우트 구분 없이 처리
+  const returnPlan203D = 0; // 라우트별 분해 불가 시 0
+  const returnPlan206A = 0;
+  
+  // Loss: 반품 미회수 (플로팅 입력)
+  const returnNotCollectedEntries = workData.returnNotCollected || [];
+  const returnLoss203D = returnNotCollectedEntries
+    .filter(e => e.route === '203D')
+    .reduce((sum, e) => sum + e.quantity, 0);
+  const returnLoss206A = returnNotCollectedEntries
+    .filter(e => e.route === '206A')
+    .reduce((sum, e) => sum + e.quantity, 0);
+  
+  // 반품 수입: 현재 구조에서는 라우트 구분 없이 평균 단가 적용
+  // 반품 할당은 있지만 라우트 분해 불가 → 보수적으로 203D 단가 적용
+  const returnIncome = 
+    (returnAllocated * rate203D) -
+    (returnLoss203D * rate203D) -
+    (returnLoss206A * rate206A);
+
+  // ================================
+  // 3. 프레시백 수입 계산
+  // ================================
+  // Plan: 프레시백 시작 = 할당 + 조정 - 이관 + 추가
+  const freshBag = workData.freshBag;
+  const fbPlanGeneral = (freshBag?.regularAllocated || 0) + (freshBag?.regularAdjustment || 0);
+  const fbPlanSolo = Math.max(0, (freshBag?.standaloneAllocated || 0) - (freshBag?.regularAdjustment || 0));
+  
+  // Loss: 미방문 (Stage F 입력) + 미회수 (플로팅 입력)
+  const fbLossGeneral = (freshBag?.undoneLinked || 0) + (freshBag?.failedAbsent || 0) + (freshBag?.failedWithProducts || 0);
+  const fbLossSolo = freshBag?.undoneSolo || 0;
+  
+  // 프레시백 수입 = (Plan - Loss) * 단가
+  const fbIncome = 
+    (Math.max(0, fbPlanGeneral - fbLossGeneral) * fbRegularRate) +
+    (Math.max(0, fbPlanSolo - fbLossSolo) * fbStandaloneRate);
+
+  // ================================
+  // 4. 채번 수입 계산 (Extra)
+  // ================================
+  const numberedEntries = workData.numbered || [];
+  const chaebeon203D = numberedEntries
+    .filter(e => e.route === '203D')
+    .reduce((sum, e) => sum + e.quantity, 0);
+  const chaebeon206A = numberedEntries
+    .filter(e => e.route === '206A')
+    .reduce((sum, e) => sum + e.quantity, 0);
+  
+  const chaebeonIncome = (chaebeon203D * rate203D) + (chaebeon206A * rate206A);
+
+  // ================================
+  // 5. 인센티브 계산 (정산기간 누적 기준)
+  // ================================
+  // 오늘 기준 회수율 계산
+  const fbTotalPlan = fbPlanGeneral + fbPlanSolo;
+  const fbTotalLoss = fbLossGeneral + fbLossSolo;
+  const fbCompleted = Math.max(0, fbTotalPlan - fbTotalLoss);
+  
+  // 일반 FB 회수율
+  const regularFBRate = fbPlanGeneral > 0 
+    ? ((fbPlanGeneral - fbLossGeneral) / fbPlanGeneral) * 100 
+    : 0;
+  // 단독 FB 회수율
+  const standaloneFBRate = fbPlanSolo > 0 
+    ? ((fbPlanSolo - fbLossSolo) / fbPlanSolo) * 100 
+    : 0;
+  
+  // 오늘 배송 기프트 누적
+  const todayDeliveries = giftPlan203D + giftPlan206A;
+  
+  // 인센티브: 조건 충족 시 배송 기프트 * 보너스 단가
+  const regularIncentive = (fbPlanGeneral > 0 && regularFBRate >= settings.incentive.regularThreshold)
+    ? todayDeliveries * settings.incentive.regularBonus
+    : 0;
+  const standaloneIncentive = (fbPlanSolo > 0 && standaloneFBRate >= settings.incentive.standaloneThreshold)
+    ? todayDeliveries * settings.incentive.standaloneBonus
+    : 0;
+
+  // ================================
+  // 6. 최종 합계
+  // ================================
+  const totalIncome = giftIncome + returnIncome + fbIncome + chaebeonIncome + regularIncentive + standaloneIncentive;
+
+  // 상태 판단
+  let status: 'complete' | 'partial' | 'incomplete' = 'incomplete';
+  let statusMessage: string | undefined;
+  
+  if (firstAllocation > 0 && totalRemaining > 0) {
+    status = 'partial';
+    if (giftPlan203D === 0 && giftPlan206A === 0) {
+      statusMessage = 'Stage B 입력 필요';
+    }
+  }
+  if (giftPlan203D > 0 || giftPlan206A > 0) {
+    status = 'complete';
+  }
+
+  // 디버그 로그
+  console.log('[calculateTodayIncome] Plan/Loss/Extra 계산:', {
+    gift: { plan203D: giftPlan203D, plan206A: giftPlan206A, loss203D: giftLoss203D, loss206A: giftLoss206A, income: giftIncome },
+    return: { allocated: returnAllocated, loss203D: returnLoss203D, loss206A: returnLoss206A, income: returnIncome },
+    fb: { planGeneral: fbPlanGeneral, planSolo: fbPlanSolo, lossGeneral: fbLossGeneral, lossSolo: fbLossSolo, income: fbIncome },
+    chaebeon: { c203D: chaebeon203D, c206A: chaebeon206A, income: chaebeonIncome },
+    incentive: { regularRate: regularFBRate, standaloneRate: standaloneFBRate, regular: regularIncentive, standalone: standaloneIncentive },
+    total: totalIncome,
+  });
+
+  return {
+    giftPlan203D,
+    giftPlan206A,
+    giftLoss203D,
+    giftLoss206A,
+    giftIncome,
+    returnPlan203D,
+    returnPlan206A,
+    returnLoss203D,
+    returnLoss206A,
+    returnIncome,
+    fbPlanGeneral,
+    fbPlanSolo,
+    fbLossGeneral,
+    fbLossSolo,
+    fbIncome,
+    chaebeon203D,
+    chaebeon206A,
+    chaebeonIncome,
+    regularFBRate,
+    standaloneFBRate,
+    regularIncentive,
+    standaloneIncentive,
+    totalIncome,
+    status,
+    statusMessage,
+  };
+}
+
+// ================================
+// 기존 함수들 (WorkRecord 기반 - 저장된 기록용)
+// ================================
+
 // 실제 배송 완료 수량 계산 (완료 입력값 기준)
 export function calculateActualDeliveries(record: WorkRecord): number {
   return record.delivery.completed;
@@ -39,14 +291,10 @@ export function calculateActualDeliveries(record: WorkRecord): number {
 // 예상 배송 수량 계산 (할당 기준 - 실시간 예상 수입 계산용)
 export function calculateExpectedDeliveries(record: WorkRecord): number {
   const allocated = record.delivery?.allocated ?? 0;
-  const firstRoundRemaining = record.delivery?.firstRoundRemaining ?? 0;
-  const transferred = record.delivery?.transferred ?? 0;
-  const added = record.delivery?.added ?? 0;
   const cancelled = record.delivery?.cancelled ?? 0;
-  const incomplete = record.delivery?.incomplete ?? 0;
   
-  // 할당 + 1회전잔여 + 추가 - 이관 - 취소 - 미완료 = 예상 완료량
-  return Math.max(0, allocated + firstRoundRemaining + added - transferred - cancelled - incomplete);
+  // 할당 - 취소(미배송) = 예상 완료량
+  return Math.max(0, allocated - cancelled);
 }
 
 // 실제 반품 완료 수량 계산 (전체 할당 - 미회수 = 완료)
@@ -78,8 +326,10 @@ export function calculateDeliveryProgress(records: WorkRecord[]): { completed: n
   let total = 0;
   
   for (const record of records) {
-    total += record.delivery.allocated - record.delivery.transferred + record.delivery.added + (record.delivery.firstRoundRemaining || 0);
-    completed += record.delivery.completed;
+    const allocated = record.delivery.allocated || 0;
+    const cancelled = record.delivery.cancelled || 0;
+    total += allocated;
+    completed += Math.max(0, allocated - cancelled);
   }
   
   return { completed, total: Math.max(total, completed) };
@@ -157,7 +407,7 @@ export function calculateTodayStandaloneFBRate(records: WorkRecord[]): number {
   return (completed / total) * 100;
 }
 
-// 일일 수입 계산
+// 일일 수입 계산 (WorkRecord 기반 - 저장된 기록용)
 export function calculateDailyIncome(
   records: WorkRecord[],
   settings: Settings
@@ -167,16 +417,16 @@ export function calculateDailyIncome(
   for (const record of records) {
     const routeRate = settings.routes[record.route];
 
-    // Delivery income - 완료가 있으면 완료 기준, 없으면 예상(할당) 기준
-    const completedDeliveries = record.delivery.completed || 0;
-    const expectedDeliveries = calculateExpectedDeliveries(record);
-    const deliveryCount = completedDeliveries > 0 ? completedDeliveries : expectedDeliveries;
+    // Delivery income = (할당 - 미배송) * 단가
+    const allocated = record.delivery.allocated || 0;
+    const cancelled = record.delivery.cancelled || 0;
+    const deliveryCount = Math.max(0, allocated - cancelled);
     total += deliveryCount * routeRate;
 
-    // Returns income - 할당 - 미회수 = 완료
+    // Returns income = (할당 - 미회수) * 단가
     total += calculateActualReturns(record) * routeRate;
 
-    // Fresh bag income - 할당 - 미회수 = 완료
+    // Fresh bag income = (시작 - 미방문) * 단가
     const fbCompleted = calculateActualFreshBags(record);
     // 일반과 단독 비율로 분배
     const regularRatio = (record.freshBag.regularAllocated || 0) / 
@@ -215,10 +465,10 @@ export function calculateDailyIncomeDetails(
   for (const record of records) {
     const routeRate = settings.routes[record.route];
     
-    // 완료가 있으면 완료 기준, 없으면 예상(할당) 기준
-    const completedDeliveries = record.delivery.completed || 0;
-    const expectedDeliveries = calculateExpectedDeliveries(record);
-    const deliveryCount = completedDeliveries > 0 ? completedDeliveries : expectedDeliveries;
+    // 할당 - 미배송 = 배송 완료
+    const allocated = record.delivery.allocated || 0;
+    const cancelled = record.delivery.cancelled || 0;
+    const deliveryCount = Math.max(0, allocated - cancelled);
     
     if (!routeIncomes[record.route]) {
       routeIncomes[record.route] = { income: 0, count: 0 };
@@ -247,9 +497,9 @@ export function calculateDailyIncomeDetails(
   const regularRate = calculateTodayRegularFBRate(records);
   const standaloneRate = calculateTodayStandaloneFBRate(records);
   const totalDeliveries = records.reduce((sum, r) => {
-    const completed = r.delivery.completed || 0;
-    const expected = calculateExpectedDeliveries(r);
-    return sum + (completed > 0 ? completed : expected);
+    const allocated = r.delivery.allocated || 0;
+    const cancelled = r.delivery.cancelled || 0;
+    return sum + Math.max(0, allocated - cancelled);
   }, 0);
   
   const regularIncentive = regularRate >= settings.incentive.regularThreshold 
@@ -320,7 +570,11 @@ export function calculatePeriodSummary(
   for (const record of periodRecords) {
     const routeRate = settings.routes[record.route];
 
-    const actualDeliveries = calculateActualDeliveries(record);
+    // 할당 - 미배송 = 배송 완료
+    const allocated = record.delivery.allocated || 0;
+    const cancelled = record.delivery.cancelled || 0;
+    const actualDeliveries = Math.max(0, allocated - cancelled);
+    
     totalDeliveries += actualDeliveries;
     totalReturns += calculateActualReturns(record);
     totalFreshBags += calculateActualFreshBags(record);
@@ -428,7 +682,11 @@ export function calculateWeeklyStats(records: WorkRecord[], settings: Settings):
         endDate,
         regularFBRate: calculateFBCollectionRate(weekRecords, 'regular'),
         standaloneFBRate: calculateFBCollectionRate(weekRecords, 'standalone'),
-        totalDeliveries: weekRecords.reduce((sum, r) => sum + calculateActualDeliveries(r), 0),
+        totalDeliveries: weekRecords.reduce((sum, r) => {
+          const allocated = r.delivery.allocated || 0;
+          const cancelled = r.delivery.cancelled || 0;
+          return sum + Math.max(0, allocated - cancelled);
+        }, 0),
         totalIncome: calculateDailyIncome(weekRecords, settings),
       };
     })
