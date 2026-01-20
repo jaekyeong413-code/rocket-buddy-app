@@ -107,18 +107,36 @@ export function calculateTodayIncome(
   // ================================
   // 1. 기프트(배송) 수입 계산
   // ================================
-  // Plan: Stage A → firstAllocationDelivery = 203D 1회전 할당
-  // Stage B → 203D 처리량 = firstAllocation - totalRemaining
-  // Stage B → 206A 할당 = totalRemaining - remaining203D
+  // 1회전: Stage A → firstAllocationDelivery = 203D 1회전 할당
+  //        Stage B → 1회전 종료 시 전체 잔여/203D 잔여
+  // 2회전: Stage C → round1EndRemaining = 1회전 종료 후 잔여
+  //        Stage D → round2TotalRemaining = 2회전 상차 후 잔여
+  //        secondAllocation = round2TotalRemaining - round1EndRemaining
   
   const firstAllocation = workData.firstAllocationDelivery || 0;
-  const totalRemaining = workData.totalRemainingAfterFirstRound || 0;
+  const totalRemainingAfterFirstRound = workData.totalRemainingAfterFirstRound || 0;
   const remaining203D = workData.routes['203D'].firstRoundRemaining || 0;
   
-  // 203D 처리량 (Plan) = 시작 - 종료 시점 전체 잔여
-  const giftPlan203D = Math.max(0, firstAllocation - totalRemaining);
-  // 206A 할당 (Plan) = 전체 잔여 - 203D 잔여
-  const giftPlan206A = Math.max(0, totalRemaining - remaining203D);
+  // Stage C: 1회전 종료 잔여 (없으면 Stage B 값 사용)
+  const remainAfter1st = workData.round1EndRemaining ?? totalRemainingAfterFirstRound;
+  // Stage D: 2회전 상차 후 잔여
+  const remainAfter2ndLoad = workData.round2TotalRemaining ?? remainAfter1st;
+  
+  // 2차 할당 역산 (음수 가능: 2차 철회)
+  const secondAllocation = remainAfter2ndLoad - remainAfter1st;
+  
+  // 1차 기프트 계획: 203D 1회전 할당
+  const firstGiftPlan203D = Math.max(0, firstAllocation - totalRemainingAfterFirstRound);
+  // 206A 1차 할당 = 전체 잔여 - 203D 잔여
+  const firstGiftPlan206A = Math.max(0, totalRemainingAfterFirstRound - remaining203D);
+  
+  // 전체 기프트 계획 (1차 + 2차 할당)
+  // 2차 할당은 라우트 분해 불가 시 206A로 간주 (206A가 2회전 담당이 일반적)
+  const giftPlan203D = firstGiftPlan203D;
+  const giftPlan206A = Math.max(0, firstGiftPlan206A + secondAllocation);
+  
+  // 오늘 전체 기프트 계획
+  const todayGiftPlanTotal = giftPlan203D + giftPlan206A;
   
   // Loss: 미배송 (플로팅 입력)
   const undeliveredEntries = workData.undelivered || [];
@@ -131,8 +149,26 @@ export function calculateTodayIncome(
   
   // 기프트 수입 = (Plan - Loss) * 단가
   const giftIncome = 
-    ((giftPlan203D - giftLoss203D) * rate203D) +
-    ((giftPlan206A - giftLoss206A) * rate206A);
+    (Math.max(0, giftPlan203D - giftLoss203D) * rate203D) +
+    (Math.max(0, giftPlan206A - giftLoss206A) * rate206A);
+  
+  // 디버그 로그
+  console.log('[calculateTodayIncome] Gift calculation:', {
+    firstAllocation,
+    totalRemainingAfterFirstRound,
+    remaining203D,
+    remainAfter1st,
+    remainAfter2ndLoad,
+    secondAllocation,
+    firstGiftPlan203D,
+    firstGiftPlan206A,
+    giftPlan203D,
+    giftPlan206A,
+    todayGiftPlanTotal,
+    giftLoss203D,
+    giftLoss206A,
+    giftIncome
+  });
 
   // ================================
   // 2. 반품 수입 계산
@@ -230,7 +266,7 @@ export function calculateTodayIncome(
   let status: 'complete' | 'partial' | 'incomplete' = 'incomplete';
   let statusMessage: string | undefined;
   
-  if (firstAllocation > 0 && totalRemaining > 0) {
+  if (firstAllocation > 0 && totalRemainingAfterFirstRound > 0) {
     status = 'partial';
     if (giftPlan203D === 0 && giftPlan206A === 0) {
       statusMessage = 'Stage B 입력 필요';
@@ -238,6 +274,10 @@ export function calculateTodayIncome(
   }
   if (giftPlan203D > 0 || giftPlan206A > 0) {
     status = 'complete';
+  }
+  // Stage D 입력 감지
+  if (workData.round2TotalRemaining !== undefined && workData.round2TotalRemaining !== remainAfter1st) {
+    statusMessage = undefined; // Stage D 입력됨
   }
 
   // 디버그 로그
