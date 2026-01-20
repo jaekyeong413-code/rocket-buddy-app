@@ -5,17 +5,10 @@ import {
   calculatePeriodSummary,
   formatCurrency,
   formatPercent,
-  getTodayRecords,
   calculateTodayIncome,
-  calculateDeliveryProgress,
-  calculateReturnsProgress,
-  calculateFBProgress,
   formatDate,
-  createDefaultReturnsData,
-  createDefaultFreshBagData,
 } from '@/lib/calculations';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { WorkRecord } from '@/types';
 
 export function IncomeCard() {
   const { settings, records } = useStore();
@@ -287,10 +280,8 @@ export function TodayIncomeCard() {
 }
 
 export function TodayFBStatus() {
-  const { settings, records, getTodayWorkData } = useStore();
-  const savedTodayRecords = getTodayRecords(records);
+  const { settings, getTodayWorkData } = useStore();
   const todayWorkData = getTodayWorkData();
-  const today = formatDate(new Date());
   
   // 현재 입력 중인 프레시백 데이터
   const freshBag = todayWorkData.freshBag;
@@ -421,11 +412,13 @@ export function TodayFBStatus() {
   );
 }
 
-function ProgressBar({ label, completed, total, color }: { 
+function ProgressBar({ label, completed, total, color, pending, pendingLabel }: { 
   label: string; 
   completed: number; 
   total: number; 
   color: string;
+  pending?: number;  // 미확정 (Stage A만 입력 시)
+  pendingLabel?: string;
 }) {
   const percentage = total > 0 ? (completed / total) * 100 : 0;
   
@@ -433,9 +426,18 @@ function ProgressBar({ label, completed, total, color }: {
     <div className="space-y-1">
       <div className="flex justify-between items-center">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="text-xs font-semibold">
-          {completed} / {total}
-        </span>
+        <div className="flex items-center gap-2">
+          {pending !== undefined && pending > 0 && total === 0 && (
+            <span className="px-1.5 py-0.5 bg-muted text-muted-foreground text-xs rounded">
+              {pendingLabel || '미확정'}
+            </span>
+          )}
+          <span className="text-xs font-semibold">
+            {pending !== undefined && pending > 0 && total === 0 
+              ? `(${pending})` 
+              : `${completed} / ${total}`}
+          </span>
+        </div>
       </div>
       <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div 
@@ -448,88 +450,50 @@ function ProgressBar({ label, completed, total, color }: {
 }
 
 export function TodayProgress() {
-  const { records, getTodayWorkData } = useStore();
-  const savedTodayRecords = getTodayRecords(records);
+  const { settings, getTodayWorkData } = useStore();
   const todayWorkData = getTodayWorkData();
-  const today = formatDate(new Date());
   
-  // 현재 입력 중인 데이터를 임시 레코드로 변환
-  const currentInputAsRecords: WorkRecord[] = [];
-  const delivery203D = todayWorkData.routes['203D'];
-  const delivery206A = todayWorkData.routes['206A'];
+  // ★ calculateTodayIncome과 동일한 단일 소스 사용
+  const incomeBreakdown = calculateTodayIncome(todayWorkData, settings);
   
-  // 2차 관련 필드
-  const round2Remaining = todayWorkData.round2TotalRemaining || 0;
-  const round1EndRemaining = todayWorkData.round1EndRemaining || 0;
+  // Stage A 입력값 (미확정 표시용)
   const firstAllocationDelivery = todayWorkData.firstAllocationDelivery || 0;
   
-  // 모든 단계(A~F)의 입력을 포함하여 레코드 생성 여부 결정
-  const hasAnyDeliveryInput = 
-    firstAllocationDelivery > 0 ||
-    (todayWorkData.totalRemainingAfterFirstRound || 0) > 0 ||
-    round1EndRemaining > 0 ||
-    round2Remaining > 0 ||
-    (todayWorkData.round2EndRemaining || 0) > 0;
+  // 배송 진행률: giftPlan 기반 (단일 소스)
+  // total = giftPlan203D + giftPlan206A (확정된 할당만)
+  // completed = total - loss (미배송 차감)
+  const deliveryTotal = incomeBreakdown.giftPlan203D + incomeBreakdown.giftPlan206A;
+  const deliveryLoss = incomeBreakdown.giftLoss203D + incomeBreakdown.giftLoss206A;
+  const deliveryCompleted = Math.max(0, deliveryTotal - deliveryLoss);
   
-  const has203DData = hasAnyDeliveryInput ||
-                      (delivery203D.allocated || 0) > 0 || 
-                      (delivery203D.firstRoundRemaining || 0) > 0 || 
-                      (delivery203D.completed || 0) > 0;
-  const has206AData = hasAnyDeliveryInput ||
-                      (delivery206A.allocated || 0) > 0 || 
-                      (delivery206A.firstRoundRemaining || 0) > 0 || 
-                      (delivery206A.completed || 0) > 0;
+  // 반품 진행률: returnPlan 기반
+  const returnsTotal = incomeBreakdown.returnPlan203D + incomeBreakdown.returnPlan206A;
+  const returnsLoss = incomeBreakdown.returnLoss203D + incomeBreakdown.returnLoss206A;
+  const returnsCompleted = Math.max(0, returnsTotal - returnsLoss);
   
-  // 2차 데이터를 포함한 DeliveryData 생성
-  // 중요: firstRoundRemaining은 사용자가 입력한 값 그대로 유지 (set, not +=)
-  const createEnhancedDelivery = (baseDelivery: typeof delivery203D, ratio: number): typeof delivery203D => {
-    const allocated = (baseDelivery.allocated || 0) > 0 
-      ? baseDelivery.allocated 
-      : Math.round(firstAllocationDelivery * ratio);
-    
-    // 사용자 입력 firstRoundRemaining을 그대로 사용 (2차 물량과 누적하지 않음)
-    const userInputRemaining = baseDelivery.firstRoundRemaining ?? 0;
-    
-    return {
-      ...baseDelivery,
-      allocated,
-      // SET 방식: 사용자 입력값만 사용, 누적 없음
-      firstRoundRemaining: userInputRemaining,
-    };
-  };
+  // FB 진행률: fbPlan 기반
+  const fbTotal = incomeBreakdown.fbPlanGeneral + incomeBreakdown.fbPlanSolo;
+  const fbLoss = incomeBreakdown.fbLossGeneral + incomeBreakdown.fbLossSolo;
+  const fbCompleted = Math.max(0, fbTotal - fbLoss);
   
-  const ratio203D = 0.5;
-  const ratio206A = 0.5;
+  // 상태 표시 (Stage A만 입력 시 배송은 미확정)
+  const isDeliveryConfirmed = incomeBreakdown.giftPlan203D > 0 || incomeBreakdown.giftPlan206A > 0;
   
-  if (has203DData) {
-    currentInputAsRecords.push({
-      id: 'temp-203d',
-      date: today,
-      route: '203D',
-      round: 1,
-      delivery: createEnhancedDelivery(delivery203D, ratio203D),
-      returns: todayWorkData.returns,
-      freshBag: todayWorkData.freshBag,
-    });
-  }
+  // 디버그 로그: 대시보드 배송 total 소스 확인
+  console.log('[TodayProgress] 배송 진행률 소스:', {
+    source: 'calculateTodayIncome().giftPlan*',
+    firstAllocationDelivery,
+    giftPlan203D: incomeBreakdown.giftPlan203D,
+    giftPlan206A: incomeBreakdown.giftPlan206A,
+    deliveryTotal,
+    deliveryLoss,
+    deliveryCompleted,
+    isDeliveryConfirmed,
+  });
   
-  if (has206AData) {
-    currentInputAsRecords.push({
-      id: 'temp-206a',
-      date: today,
-      route: '206A',
-      round: 1,
-      delivery: createEnhancedDelivery(delivery206A, ratio206A),
-      returns: createDefaultReturnsData(),
-      freshBag: createDefaultFreshBagData(),
-    });
-  }
-
-  const allTodayRecords = [...savedTodayRecords, ...currentInputAsRecords];
-  
-  const deliveryProgress = calculateDeliveryProgress(allTodayRecords);
-  const returnsProgress = calculateReturnsProgress(allTodayRecords);
-  const fbProgress = calculateFBProgress(allTodayRecords);
+  const deliveryProgress = { completed: deliveryCompleted, total: deliveryTotal };
+  const returnsProgress = { completed: returnsCompleted, total: returnsTotal };
+  const fbProgress = { completed: fbCompleted, total: fbTotal };
 
   return (
     <div className="bg-card rounded-2xl p-5 shadow-card border border-border/30 animate-slide-up">
@@ -544,6 +508,8 @@ export function TodayProgress() {
           completed={deliveryProgress.completed} 
           total={deliveryProgress.total}
           color="bg-primary"
+          pending={firstAllocationDelivery}
+          pendingLabel="Stage B 입력 필요"
         />
         <ProgressBar 
           label="반품" 
@@ -563,45 +529,30 @@ export function TodayProgress() {
 }
 
 export function TodayStats() {
-  const { records, getTodayWorkData } = useStore();
-  const savedTodayRecords = getTodayRecords(records);
+  const { settings, getTodayWorkData } = useStore();
   const todayWorkData = getTodayWorkData();
-  const today = formatDate(new Date());
-
-  // 현재 입력 중인 데이터를 임시 레코드로 변환
-  const currentInputAsRecords: WorkRecord[] = [];
-  const delivery203D = todayWorkData.routes['203D'];
-  const delivery206A = todayWorkData.routes['206A'];
   
-  if (delivery203D.allocated > 0 || delivery203D.completed > 0) {
-    currentInputAsRecords.push({
-      id: 'temp-203d',
-      date: today,
-      route: '203D',
-      round: 1,
-      delivery: delivery203D,
-      returns: todayWorkData.returns,
-      freshBag: todayWorkData.freshBag,
-    });
-  }
+  // ★ calculateTodayIncome과 동일한 단일 소스 사용
+  const incomeBreakdown = calculateTodayIncome(todayWorkData, settings);
   
-  if (delivery206A.allocated > 0 || delivery206A.completed > 0) {
-    currentInputAsRecords.push({
-      id: 'temp-206a',
-      date: today,
-      route: '206A',
-      round: 1,
-      delivery: delivery206A,
-      returns: createDefaultReturnsData(),
-      freshBag: createDefaultFreshBagData(),
-    });
-  }
-
-  const allTodayRecords = [...savedTodayRecords, ...currentInputAsRecords];
-
-  const deliveryProgress = calculateDeliveryProgress(allTodayRecords);
-  const returnsProgress = calculateReturnsProgress(allTodayRecords);
-  const fbProgress = calculateFBProgress(allTodayRecords);
+  // 배송: giftPlan 기반
+  const deliveryTotal = incomeBreakdown.giftPlan203D + incomeBreakdown.giftPlan206A;
+  const deliveryLoss = incomeBreakdown.giftLoss203D + incomeBreakdown.giftLoss206A;
+  const deliveryCompleted = Math.max(0, deliveryTotal - deliveryLoss);
+  
+  // 반품: returnPlan 기반
+  const returnsTotal = incomeBreakdown.returnPlan203D + incomeBreakdown.returnPlan206A;
+  const returnsLoss = incomeBreakdown.returnLoss203D + incomeBreakdown.returnLoss206A;
+  const returnsCompleted = Math.max(0, returnsTotal - returnsLoss);
+  
+  // FB: fbPlan 기반
+  const fbTotal = incomeBreakdown.fbPlanGeneral + incomeBreakdown.fbPlanSolo;
+  const fbLoss = incomeBreakdown.fbLossGeneral + incomeBreakdown.fbLossSolo;
+  const fbCompleted = Math.max(0, fbTotal - fbLoss);
+  
+  const deliveryProgress = { completed: deliveryCompleted, total: deliveryTotal };
+  const returnsProgress = { completed: returnsCompleted, total: returnsTotal };
+  const fbProgress = { completed: fbCompleted, total: fbTotal };
 
   const items = [
     {
