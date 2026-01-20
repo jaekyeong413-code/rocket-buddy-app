@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { Package, TrendingUp, Truck, Award, Sparkles, ChevronRight, RotateCcw, Wallet } from 'lucide-react';
+import { Package, TrendingUp, Truck, Award, Sparkles, ChevronRight, RotateCcw, Wallet, AlertCircle } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import {
   calculatePeriodSummary,
   formatCurrency,
   formatPercent,
   getTodayRecords,
-  calculateDailyIncome,
-  calculateDailyIncomeDetails,
+  calculateTodayIncome,
   calculateDeliveryProgress,
   calculateReturnsProgress,
   calculateFBProgress,
@@ -66,101 +65,14 @@ export function IncomeCard() {
 }
 
 export function TodayIncomeCard() {
-  const { settings, records, getTodayWorkData } = useStore();
+  const { settings, getTodayWorkData } = useStore();
   const [showDetails, setShowDetails] = useState(false);
-  
-  // 저장된 오늘 기록
-  const savedTodayRecords = getTodayRecords(records);
   
   // 현재 입력 중인 오늘 데이터 (store에서 실시간 조회)
   const todayWorkData = getTodayWorkData();
-  const today = formatDate(new Date());
   
-  // 현재 입력 중인 데이터를 임시 레코드로 변환
-  const currentInputAsRecords: WorkRecord[] = [];
-  const delivery203D = todayWorkData.routes['203D'];
-  const delivery206A = todayWorkData.routes['206A'];
-  const freshBag = todayWorkData.freshBag;
-  const returns = todayWorkData.returns;
-  
-  // ★ Stage A: 배송 1차 전체 물량 (= 203D 1회전 할당)
-  const firstAllocation = todayWorkData.firstAllocationDelivery || 0;
-  
-  // ★ Stage B: 1회전 현재 '전체 잔여 물량' (= 203D 종료 후 남은 전체)
-  const totalRemaining = todayWorkData.totalRemainingAfterFirstRound || 0;
-  
-  // ★ Stage B: 203D 잔여 물량 (입력 안 하면 기본값 0)
-  const remaining203D = delivery203D.firstRoundRemaining || 0;
-  
-  // ★ 핵심 계산 (Stage B 결과 반영)
-  // 203D 실제 처리량 = firstAllocation - totalRemaining
-  // 설명: 203D 1회전에서 처리한 양 = 시작 물량 - 종료 시점 전체 잔여
-  const delivered203D = Math.max(0, firstAllocation - totalRemaining);
-  
-  // 206A 할당 = totalRemaining - remaining203D
-  // 설명: 전체 잔여에서 203D에 남길 물량을 빼면 206A로 넘어가는 물량
-  const allocated206A = Math.max(0, totalRemaining - remaining203D);
-  
-  // 디버그 로그 (수입 계산 확인용)
-  console.log('[TodayIncomeCard] Stage 계산:', {
-    'Stage A - firstAllocation (203D 1회전 할당)': firstAllocation,
-    'Stage B - totalRemaining (전체 잔여)': totalRemaining,
-    'Stage B - remaining203D (203D 잔여)': remaining203D,
-    '→ delivered203D (203D 처리량)': delivered203D,
-    '→ allocated206A (206A 할당)': allocated206A,
-  });
-  
-  // 미배송 수량 계산 (수입 차감용)
-  const undeliveredByRoute = (todayWorkData.undelivered || []).reduce((acc, entry) => {
-    acc[entry.route] = (acc[entry.route] || 0) + entry.quantity;
-    return acc;
-  }, {} as Record<string, number>);
-  
-  const has203DData = delivered203D > 0;
-  const has206AData = allocated206A > 0;
-  
-  if (has203DData) {
-    currentInputAsRecords.push({
-      id: 'temp-203d',
-      date: today,
-      route: '203D',
-      round: 1,
-      delivery: {
-        ...delivery203D,
-        allocated: delivered203D, // ★ 할당이 아니라 실제 처리량
-        cancelled: undeliveredByRoute['203D'] || 0,
-      },
-      returns,
-      freshBag,
-    });
-  }
-  
-  if (has206AData) {
-    currentInputAsRecords.push({
-      id: 'temp-206a',
-      date: today,
-      route: '206A',
-      round: 1,
-      delivery: {
-        ...delivery206A,
-        allocated: allocated206A,
-        cancelled: undeliveredByRoute['206A'] || 0,
-      },
-      returns: createDefaultReturnsData(),
-      freshBag: createDefaultFreshBagData(),
-    });
-  }
-
-  // 저장된 기록 + 현재 입력 중인 데이터 합산
-  const allTodayRecords = [...savedTodayRecords, ...currentInputAsRecords];
-  
-  // 채번 수입 계산 (라우트별 단가 적용)
-  const numberedIncome = (todayWorkData.numbered || []).reduce((sum, entry) => {
-    return sum + (settings.routes[entry.route] * entry.quantity);
-  }, 0);
-  
-  const todayIncome = calculateDailyIncome(allTodayRecords, settings) + numberedIncome;
-  const details = calculateDailyIncomeDetails(allTodayRecords, settings);
+  // ★ Plan/Loss/Extra 기반 수입 계산
+  const incomeBreakdown = calculateTodayIncome(todayWorkData, settings);
 
   return (
     <>
@@ -173,9 +85,14 @@ export function TodayIncomeCard() {
             <div className="flex items-center gap-2 mb-1">
               <Wallet className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium text-muted-foreground">오늘의 예상 수입</span>
+              {incomeBreakdown.status === 'incomplete' && (
+                <span className="px-1.5 py-0.5 bg-muted text-muted-foreground text-xs rounded">
+                  입력 대기
+                </span>
+              )}
             </div>
             <div className="text-2xl font-bold text-foreground">
-              {formatCurrency(todayIncome)}
+              {formatCurrency(incomeBreakdown.totalIncome)}
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -192,74 +109,174 @@ export function TodayIncomeCard() {
           </DialogHeader>
           
           <div className="space-y-4 mt-4">
+            {/* 상태 메시지 */}
+            {incomeBreakdown.statusMessage && (
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-xl">
+                <AlertCircle className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">{incomeBreakdown.statusMessage}</span>
+              </div>
+            )}
+
+            {/* 기프트(배송) 수입 */}
             <div className="space-y-2">
-              <h4 className="text-sm font-medium text-muted-foreground">배송 수입</h4>
-              {details.routeIncomes.length > 0 ? (
-                details.routeIncomes.map((item) => (
-                  <div key={item.route} className="flex items-center justify-between p-3 bg-accent/50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-primary">{item.route}</span>
-                      <span className="text-xs text-muted-foreground">{item.count}건</span>
+              <h4 className="text-sm font-medium text-muted-foreground">배송 수입 (기프트)</h4>
+              {(incomeBreakdown.giftPlan203D > 0 || incomeBreakdown.giftPlan206A > 0) ? (
+                <>
+                  {incomeBreakdown.giftPlan203D > 0 && (
+                    <div className="flex items-center justify-between p-3 bg-accent/50 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-primary">203D</span>
+                        <span className="text-xs text-muted-foreground">
+                          {incomeBreakdown.giftPlan203D - incomeBreakdown.giftLoss203D}건
+                          {incomeBreakdown.giftLoss203D > 0 && (
+                            <span className="text-destructive ml-1">(-{incomeBreakdown.giftLoss203D})</span>
+                          )}
+                        </span>
+                      </div>
+                      <span className="font-medium">
+                        {formatCurrency((incomeBreakdown.giftPlan203D - incomeBreakdown.giftLoss203D) * settings.routes['203D'])}
+                      </span>
                     </div>
-                    <span className="font-medium">{formatCurrency(item.income)}</span>
-                  </div>
-                ))
+                  )}
+                  {incomeBreakdown.giftPlan206A > 0 && (
+                    <div className="flex items-center justify-between p-3 bg-accent/50 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-primary">206A</span>
+                        <span className="text-xs text-muted-foreground">
+                          {incomeBreakdown.giftPlan206A - incomeBreakdown.giftLoss206A}건
+                          {incomeBreakdown.giftLoss206A > 0 && (
+                            <span className="text-destructive ml-1">(-{incomeBreakdown.giftLoss206A})</span>
+                          )}
+                        </span>
+                      </div>
+                      <span className="font-medium">
+                        {formatCurrency((incomeBreakdown.giftPlan206A - incomeBreakdown.giftLoss206A) * settings.routes['206A'])}
+                      </span>
+                    </div>
+                  )}
+                </>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-2">오늘 기록 없음</p>
+                <p className="text-sm text-muted-foreground text-center py-2">Stage A/B 입력 필요</p>
               )}
             </div>
 
+            {/* 반품 수입 */}
             <div className="flex items-center justify-between p-3 bg-warning/10 rounded-xl">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-warning">반품</span>
-                <span className="text-xs text-muted-foreground">{details.returnsCount}건</span>
+                <span className="text-xs text-muted-foreground">
+                  {(todayWorkData.returns?.allocated || 0) - incomeBreakdown.returnLoss203D - incomeBreakdown.returnLoss206A}건
+                  {(incomeBreakdown.returnLoss203D + incomeBreakdown.returnLoss206A) > 0 && (
+                    <span className="text-destructive ml-1">
+                      (-{incomeBreakdown.returnLoss203D + incomeBreakdown.returnLoss206A})
+                    </span>
+                  )}
+                </span>
               </div>
-              <span className="font-medium">{formatCurrency(details.returnsIncome)}</span>
+              <span className="font-medium">{formatCurrency(incomeBreakdown.returnIncome)}</span>
             </div>
 
+            {/* 프레시백 수입 */}
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-muted-foreground">프레시백</h4>
               <div className="flex items-center justify-between p-3 bg-success/10 rounded-xl">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-success">일반(연계)</span>
-                  <span className="text-xs text-muted-foreground">{details.fbCount.regular}건</span>
+                  <span className="text-xs text-muted-foreground">
+                    {Math.max(0, incomeBreakdown.fbPlanGeneral - incomeBreakdown.fbLossGeneral)}건
+                    {incomeBreakdown.fbLossGeneral > 0 && (
+                      <span className="text-destructive ml-1">(-{incomeBreakdown.fbLossGeneral})</span>
+                    )}
+                  </span>
                 </div>
-                <span className="font-medium">{formatCurrency(details.fbIncome.regular)}</span>
+                <span className="font-medium">
+                  {formatCurrency(Math.max(0, incomeBreakdown.fbPlanGeneral - incomeBreakdown.fbLossGeneral) * settings.freshBag.regular)}
+                </span>
               </div>
               <div className="flex items-center justify-between p-3 bg-success/10 rounded-xl">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-success">단독</span>
-                  <span className="text-xs text-muted-foreground">{details.fbCount.standalone}건</span>
+                  <span className="text-xs text-muted-foreground">
+                    {Math.max(0, incomeBreakdown.fbPlanSolo - incomeBreakdown.fbLossSolo)}건
+                    {incomeBreakdown.fbLossSolo > 0 && (
+                      <span className="text-destructive ml-1">(-{incomeBreakdown.fbLossSolo})</span>
+                    )}
+                  </span>
                 </div>
-                <span className="font-medium">{formatCurrency(details.fbIncome.standalone)}</span>
+                <span className="font-medium">
+                  {formatCurrency(Math.max(0, incomeBreakdown.fbPlanSolo - incomeBreakdown.fbLossSolo) * settings.freshBag.standalone)}
+                </span>
               </div>
             </div>
 
-            {(details.fbIncentive.regular > 0 || details.fbIncentive.standalone > 0) && (
+            {/* 채번 수입 (Extra) */}
+            {(incomeBreakdown.chaebeon203D > 0 || incomeBreakdown.chaebeon206A > 0) && (
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  인센티브 (예상)
+                  채번 (추가 수입)
                 </h4>
-                {details.fbIncentive.regular > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-primary/10 rounded-xl">
-                    <span className="text-sm font-medium text-primary">일반FB 인센티브</span>
-                    <span className="font-medium text-primary">+{formatCurrency(details.fbIncentive.regular)}</span>
+                {incomeBreakdown.chaebeon203D > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-blue-600">203D 채번</span>
+                      <span className="text-xs text-muted-foreground">{incomeBreakdown.chaebeon203D}건</span>
+                    </div>
+                    <span className="font-medium text-blue-600">
+                      +{formatCurrency(incomeBreakdown.chaebeon203D * settings.routes['203D'])}
+                    </span>
                   </div>
                 )}
-                {details.fbIncentive.standalone > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-primary/10 rounded-xl">
-                    <span className="text-sm font-medium text-primary">단독FB 인센티브</span>
-                    <span className="font-medium text-primary">+{formatCurrency(details.fbIncentive.standalone)}</span>
+                {incomeBreakdown.chaebeon206A > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-blue-600">206A 채번</span>
+                      <span className="text-xs text-muted-foreground">{incomeBreakdown.chaebeon206A}건</span>
+                    </div>
+                    <span className="font-medium text-blue-600">
+                      +{formatCurrency(incomeBreakdown.chaebeon206A * settings.routes['206A'])}
+                    </span>
                   </div>
                 )}
               </div>
             )}
 
+            {/* 인센티브 */}
+            {(incomeBreakdown.regularIncentive > 0 || incomeBreakdown.standaloneIncentive > 0) && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  인센티브 (예상)
+                </h4>
+                {incomeBreakdown.regularIncentive > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-primary/10 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-primary">일반FB</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatPercent(incomeBreakdown.regularFBRate)} ≥ {settings.incentive.regularThreshold}%
+                      </span>
+                    </div>
+                    <span className="font-medium text-primary">+{formatCurrency(incomeBreakdown.regularIncentive)}</span>
+                  </div>
+                )}
+                {incomeBreakdown.standaloneIncentive > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-primary/10 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-primary">단독FB</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatPercent(incomeBreakdown.standaloneFBRate)} ≥ {settings.incentive.standaloneThreshold}%
+                      </span>
+                    </div>
+                    <span className="font-medium text-primary">+{formatCurrency(incomeBreakdown.standaloneIncentive)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 최종 합계 */}
             <div className="pt-4 border-t border-border">
               <div className="flex items-center justify-between">
                 <span className="text-lg font-semibold">오늘 총 수입</span>
-                <span className="text-xl font-bold text-primary">{formatCurrency(todayIncome)}</span>
+                <span className="text-xl font-bold text-primary">{formatCurrency(incomeBreakdown.totalIncome)}</span>
               </div>
             </div>
           </div>
