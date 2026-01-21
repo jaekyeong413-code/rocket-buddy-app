@@ -175,12 +175,10 @@ export function calculateTodayIncome(
   // ================================
   // Plan: 반품 할당 = 회수 지시 = 완료로 간주
   // 반품은 라우트 구분이 필요하지만 현재 구조상 통합 입력
-  // TODO: 라우트별 반품 할당이 필요하면 추가
-  
+  // 반품 할당: 현재 구조에서는 라우트 분해가 불가
+  // 임의 분할 금지 원칙 → returnPlan203D에 전체 할당량 배정 (수입 계산과 동일)
   const returnAllocated = workData.returns?.allocated || 0;
-  // 현재 구조에서는 반품 할당의 라우트 분해가 안 됨
-  // 임의 분할 금지 원칙에 따라, 라우트 구분 없이 처리
-  const returnPlan203D = 0; // 라우트별 분해 불가 시 0
+  const returnPlan203D = returnAllocated; // 라우트 분해 불가 → 203D에 전체 배정
   const returnPlan206A = 0;
   
   // Loss: 반품 미회수 (플로팅 입력)
@@ -198,6 +196,16 @@ export function calculateTodayIncome(
     (returnAllocated * rate203D) -
     (returnLoss203D * rate203D) -
     (returnLoss206A * rate206A);
+
+  // 디버그 로그: 반품 계산 확인 (TodayProgress와 일치해야 함)
+  console.log('[calculateTodayIncome] 반품 계산:', {
+    returnAllocated,
+    returnPlan203D,
+    returnPlan206A,
+    returnLoss203D,
+    returnLoss206A,
+    returnIncome,
+  });
 
   // ================================
   // 3. 프레시백 수입 계산

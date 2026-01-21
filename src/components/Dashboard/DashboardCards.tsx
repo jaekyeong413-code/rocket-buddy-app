@@ -466,10 +466,22 @@ export function TodayProgress() {
   const deliveryLoss = incomeBreakdown.giftLoss203D + incomeBreakdown.giftLoss206A;
   const deliveryCompleted = Math.max(0, deliveryTotal - deliveryLoss);
   
-  // 반품 진행률: returnPlan 기반
+  // 반품 진행률: returnPlan 기반 (calculateTodayIncome과 동일 소스)
   const returnsTotal = incomeBreakdown.returnPlan203D + incomeBreakdown.returnPlan206A;
   const returnsLoss = incomeBreakdown.returnLoss203D + incomeBreakdown.returnLoss206A;
   const returnsCompleted = Math.max(0, returnsTotal - returnsLoss);
+  
+  // 디버그 로그: 반품 진행률 소스 확인
+  console.log('[TodayProgress] 반품 진행률 소스:', {
+    source: 'calculateTodayIncome().returnPlan*',
+    returnPlan203D: incomeBreakdown.returnPlan203D,
+    returnPlan206A: incomeBreakdown.returnPlan206A,
+    returnsTotal,
+    returnLoss203D: incomeBreakdown.returnLoss203D,
+    returnLoss206A: incomeBreakdown.returnLoss206A,
+    returnsLoss,
+    returnsCompleted,
+  });
   
   // FB 진행률: fbPlan 기반
   const fbTotal = incomeBreakdown.fbPlanGeneral + incomeBreakdown.fbPlanSolo;
