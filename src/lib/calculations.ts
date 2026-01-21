@@ -107,38 +107,41 @@ export function calculateTodayIncome(
   // ================================
   // 1. 기프트(배송) 수입 계산
   // ================================
-  // 1회전: Stage A → firstAllocationDelivery = 203D 1회전 할당
-  //        Stage B → 1회전 종료 시 전체 잔여/203D 잔여
-  // 2회전: Stage C → round1EndRemaining = 1회전 종료 후 잔여
-  //        Stage D → round2TotalRemaining = 2회전 상차 후 잔여
-  //        secondAllocation = round2TotalRemaining - round1EndRemaining
+  // 핵심 불변 규칙:
+  // - 오늘 배송 할당 수입은 Stage C/D/E 잔여 입력으로 절대 차감하지 않는다
+  // - Stage C/D/E 잔여는 진행률/분배 확인용으로만 사용
+  // - 수입 차감은 오직 Stage F의 "미배송 기프트" 입력만 사용
+  //
+  // 할당 계산 흐름:
+  // - Stage A: 203D 1회전 할당 (firstAllocationDelivery)
+  // - Stage B: 1회전 종료 시 전체 잔여/203D 잔여 → 206A 1회전 할당 역산
+  // - Stage D: 2회전 상차 후 전체 잔여 → 2회전 할당 역산 (추가 할당)
+  // - 2회전 할당 = Stage D 전체 잔여 - Stage B 전체 잔여 (C 잔여 아님!)
   
   const firstAllocation = workData.firstAllocationDelivery || 0;
   const totalRemainingAfterFirstRound = workData.totalRemainingAfterFirstRound || 0;
   const remaining203D = workData.routes['203D'].firstRoundRemaining || 0;
   
-  // Stage C: 1회전 종료 잔여 (없으면 Stage B 값 사용)
-  const remainAfter1st = workData.round1EndRemaining ?? totalRemainingAfterFirstRound;
-  // Stage D: 2회전 상차 후 잔여
-  const remainAfter2ndLoad = workData.round2TotalRemaining ?? remainAfter1st;
+  // 206A 1회전 잔여 = 전체 잔여 - 203D 잔여 (Stage B 시점)
+  const remaining206A = Math.max(0, totalRemainingAfterFirstRound - remaining203D);
   
-  // 2차 할당 역산 (음수 가능: 2차 철회)
-  const secondAllocation = remainAfter2ndLoad - remainAfter1st;
+  // Stage D: 2회전 상차 후 전체 잔여
+  // 2회전 할당 = (Stage D 전체 잔여) - (Stage B 전체 잔여)
+  // Stage C 잔여는 수입 계산에서 사용하지 않음! (진행률 표시용)
+  const remainAfter2ndLoad = workData.round2TotalRemaining ?? totalRemainingAfterFirstRound;
+  const secondAllocation = Math.max(0, remainAfter2ndLoad - totalRemainingAfterFirstRound);
   
-  // 1차 기프트 계획: 203D 1회전 할당
-  const firstGiftPlan203D = Math.max(0, firstAllocation - totalRemainingAfterFirstRound);
-  // 206A 1차 할당 = 전체 잔여 - 203D 잔여
-  const firstGiftPlan206A = Math.max(0, totalRemainingAfterFirstRound - remaining203D);
-  
-  // 전체 기프트 계획 (1차 + 2차 할당)
-  // 2차 할당은 라우트 분해 불가 시 206A로 간주 (206A가 2회전 담당이 일반적)
-  const giftPlan203D = firstGiftPlan203D;
-  const giftPlan206A = Math.max(0, firstGiftPlan206A + secondAllocation);
+  // 1차 기프트 계획: 
+  // - 203D: Stage A 할당 전체 (203D가 1회전 전담)
+  // - 206A: Stage B 시점 206A 잔여 (206A가 2회전 전담)
+  const giftPlan203D = firstAllocation;
+  const giftPlan206A = remaining206A + secondAllocation;
   
   // 오늘 전체 기프트 계획
   const todayGiftPlanTotal = giftPlan203D + giftPlan206A;
   
-  // Loss: 미배송 (플로팅 입력)
+  // Loss: 미배송 (Stage F에서 플로팅 입력으로만 차감)
+  // ⚠️ Stage C/D/E 잔여는 여기서 사용하지 않음!
   const undeliveredEntries = workData.undelivered || [];
   const giftLoss203D = undeliveredEntries
     .filter(e => e.route === '203D')
@@ -148,25 +151,23 @@ export function calculateTodayIncome(
     .reduce((sum, e) => sum + e.quantity, 0);
   
   // 기프트 수입 = (Plan - Loss) * 단가
+  // Loss는 오직 Stage F 미배송 입력(undeliveredEntries)만 사용
   const giftIncome = 
     (Math.max(0, giftPlan203D - giftLoss203D) * rate203D) +
     (Math.max(0, giftPlan206A - giftLoss206A) * rate206A);
   
   // 디버그 로그
-  console.log('[calculateTodayIncome] Gift calculation:', {
+  console.log('[calculateTodayIncome] Gift calculation (불변: C/D/E 잔여는 수입차감 사용안함):', {
     firstAllocation,
     totalRemainingAfterFirstRound,
     remaining203D,
-    remainAfter1st,
+    remaining206A,
     remainAfter2ndLoad,
     secondAllocation,
-    firstGiftPlan203D,
-    firstGiftPlan206A,
     giftPlan203D,
     giftPlan206A,
     todayGiftPlanTotal,
-    giftLoss203D,
-    giftLoss206A,
+    'Loss(StageF only)': { giftLoss203D, giftLoss206A },
     giftIncome
   });
 
@@ -283,8 +284,8 @@ export function calculateTodayIncome(
   if (giftPlan203D > 0 || giftPlan206A > 0) {
     status = 'complete';
   }
-  // Stage D 입력 감지
-  if (workData.round2TotalRemaining !== undefined && workData.round2TotalRemaining !== remainAfter1st) {
+  // Stage D 입력 감지 (Stage B 전체잔여와 비교)
+  if (workData.round2TotalRemaining !== undefined && workData.round2TotalRemaining !== totalRemainingAfterFirstRound) {
     statusMessage = undefined; // Stage D 입력됨
   }
 
