@@ -5,6 +5,8 @@ interface StageBProps {
   onTotalRemainingChange: (value: string) => void;
   on203DRemainingChange: (value: string) => void;
   onFreshBagChange: (data: FreshBagData) => void;
+  onStageBReturnRemaining203DChange?: (value: string) => void;
+  onStageBUnvisitedFBTotal203DChange?: (value: string) => void;
 }
 
 export function StageB({
@@ -12,6 +14,8 @@ export function StageB({
   onTotalRemainingChange,
   on203DRemainingChange,
   onFreshBagChange,
+  onStageBReturnRemaining203DChange,
+  onStageBUnvisitedFBTotal203DChange,
 }: StageBProps) {
   const freshBag = workData.freshBag;
   const delivery203D = workData.routes['203D'];
@@ -80,6 +84,50 @@ export function StageB({
             </p>
           </div>
         )}
+      </div>
+
+      {/* ★ 신규: 203D 잔여 반품 */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-warning/30">
+        <label className="text-xs font-medium text-warning mb-2 block">
+          203D 잔여 반품
+        </label>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.stageB_returnRemaining_203D ?? ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            onStageBReturnRemaining203DChange?.(val);
+          }}
+          placeholder="0"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          Stage B 시점 기준 203D 잔여 반품. 미입력=0
+        </p>
+      </div>
+
+      {/* ★ 신규: 203D 미방문 프레시백 */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-success/30">
+        <label className="text-xs font-medium text-success mb-2 block">
+          203D 미방문 프레시백
+        </label>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.stageB_unvisitedFB_total_203D ?? ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            onStageBUnvisitedFBTotal203DChange?.(val);
+          }}
+          placeholder="0"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-success/10 rounded-xl border-2 border-transparent focus:border-success focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          Stage B 시점 기준 203D 미방문 프백 총량(일반+단독). 미입력=0
+        </p>
       </div>
 
       {/* 203D 미확인 프레시백 (선택) */}

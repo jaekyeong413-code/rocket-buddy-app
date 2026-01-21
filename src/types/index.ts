@@ -144,6 +144,13 @@ export interface TodayWorkData {
   round2EndRemaining?: number;          // Stage E: 2회전 종료 잔여
   round2EndReturnsRemaining?: number;   // Stage E: 2회전 종료 반품 잔여
   
+  // ★ 신규 5개 필드: 라우트별 원천 데이터
+  stageB_returnRemaining_203D?: number;      // Stage B: 203D 잔여 반품
+  stageB_unvisitedFB_total_203D?: number;    // Stage B: 203D 미방문 프레시백 총량
+  stageC_returnRemaining_206A?: number;      // Stage C: 206A 잔여 반품
+  stageE_unvisitedFB_solo_203D?: number;     // Stage E: 203D 미방문 단독 프레시백
+  stageF_unvisitedFB_solo_206A?: number;     // Stage F: 206A 미방문 단독 프레시백
+  
   // 플로팅 메뉴 입력 (FAB)
   freshBagNotCollected?: FreshBagNotCollectedEntry[];  // 프백 미회수 목록
   returnNotCollected?: ReturnNotCollectedEntry[];      // 반품 미회수 목록

@@ -157,6 +157,32 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     updateWorkData(date, { round2EndReturnsRemaining: remaining });
   };
 
+  // ★ 신규 5개 필드 핸들러
+  const handleStageBReturnRemaining203DChange = (value: string) => {
+    const val = parseInt(value) || 0;
+    updateWorkData(date, { stageB_returnRemaining_203D: val });
+  };
+
+  const handleStageBUnvisitedFBTotal203DChange = (value: string) => {
+    const val = parseInt(value) || 0;
+    updateWorkData(date, { stageB_unvisitedFB_total_203D: val });
+  };
+
+  const handleStageCReturnRemaining206AChange = (value: string) => {
+    const val = parseInt(value) || 0;
+    updateWorkData(date, { stageC_returnRemaining_206A: val });
+  };
+
+  const handleStageEUnvisitedFBSolo203DChange = (value: string) => {
+    const val = parseInt(value) || 0;
+    updateWorkData(date, { stageE_unvisitedFB_solo_203D: val });
+  };
+
+  const handleStageFUnvisitedFBSolo206AChange = (value: string) => {
+    const val = parseInt(value) || 0;
+    updateWorkData(date, { stageF_unvisitedFB_solo_206A: val });
+  };
+
   // 오늘 예상 수입 실시간 계산
   const todayRecords = records.filter(r => r.date === date);
   const currentInputAsRecords: WorkRecord[] = [];
@@ -297,6 +323,8 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             onTotalRemainingChange={handleTotalRemainingChange}
             on203DRemainingChange={handle203DRemainingChange}
             onFreshBagChange={handleFreshBagChange}
+            onStageBReturnRemaining203DChange={handleStageBReturnRemaining203DChange}
+            onStageBUnvisitedFBTotal203DChange={handleStageBUnvisitedFBTotal203DChange}
           />
         );
       case 'C':
@@ -305,6 +333,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             workData={workData}
             onFreshBagChange={handleFreshBagRound1EndChange}
             onRound1EndRemainingChange={handleRound1EndRemainingChange}
+            onStageCReturnRemaining206AChange={handleStageCReturnRemaining206AChange}
           />
         );
       case 'D':
@@ -323,6 +352,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             onRound2RemainingChange={handleRound2RemainingChange}
             onRound2ReturnsRemainingChange={handleRound2ReturnsRemainingChange}
             onFreshBagChange={handleFreshBagChange}
+            onStageEUnvisitedFBSolo203DChange={handleStageEUnvisitedFBSolo203DChange}
           />
         );
       case 'F':
@@ -330,6 +360,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
           <StageF
             workData={workData}
             onFreshBagChange={handleFreshBagChange}
+            onStageFUnvisitedFBSolo206AChange={handleStageFUnvisitedFBSolo206AChange}
           />
         );
       default:

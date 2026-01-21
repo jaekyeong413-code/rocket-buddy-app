@@ -4,11 +4,13 @@ import { TodayWorkData, FreshBagData } from '@/types';
 interface StageFProps {
   workData: TodayWorkData;
   onFreshBagChange: (data: FreshBagData) => void;
+  onStageFUnvisitedFBSolo206AChange?: (value: string) => void;
 }
 
 export function StageF({
   workData,
   onFreshBagChange,
+  onStageFUnvisitedFBSolo206AChange,
 }: StageFProps) {
   const freshBag = workData.freshBag;
 
@@ -96,6 +98,28 @@ export function StageF({
             시작({freshbagStart}) - 미방문({totalUndone}) = 완료({freshbagCompleted})
           </p>
         </div>
+      </div>
+
+      {/* ★ 신규: 206A 미방문 단독 프레시백 */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-success/30">
+        <label className="text-xs font-medium text-success mb-2 block">
+          206A 미방문 단독 프레시백
+        </label>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.stageF_unvisitedFB_solo_206A ?? ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            onStageFUnvisitedFBSolo206AChange?.(val);
+          }}
+          placeholder="0"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-success/10 rounded-xl border-2 border-transparent focus:border-success focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          모든 배송 종료 시점 확정 206A 미방문(단독). 미입력=0
+        </p>
       </div>
 
       {/* 미회수 요약 (기존 유지) */}
