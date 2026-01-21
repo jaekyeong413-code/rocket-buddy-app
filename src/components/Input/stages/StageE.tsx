@@ -5,6 +5,7 @@ interface StageEProps {
   onRound2RemainingChange: (value: string) => void;
   onRound2ReturnsRemainingChange: (value: string) => void;
   onFreshBagChange: (data: FreshBagData) => void;
+  onStageEUnvisitedFBSolo203DChange?: (value: string) => void;
 }
 
 export function StageE({
@@ -12,6 +13,7 @@ export function StageE({
   onRound2RemainingChange,
   onRound2ReturnsRemainingChange,
   onFreshBagChange,
+  onStageEUnvisitedFBSolo203DChange,
 }: StageEProps) {
   const freshBag = workData.freshBag;
 
@@ -54,6 +56,28 @@ export function StageE({
           placeholder="전체 남은 반품 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
         />
+      </div>
+
+      {/* ★ 신규: 203D 미방문 단독 프레시백 */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-success/30">
+        <label className="text-xs font-medium text-success mb-2 block">
+          203D 미방문 단독 프레시백
+        </label>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.stageE_unvisitedFB_solo_203D ?? ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            onStageEUnvisitedFBSolo203DChange?.(val);
+          }}
+          placeholder="0"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-success/10 rounded-xl border-2 border-transparent focus:border-success focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          203D 종료 시점 확정 미방문(단독). 미입력=0
+        </p>
       </div>
 
       {/* 203D 미확인 프레시백 (선택) */}
