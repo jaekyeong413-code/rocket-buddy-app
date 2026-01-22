@@ -118,28 +118,35 @@ export function calculateTodayIncome(
   // Stage A: 오늘 기프트 총 Plan (고정, 절대 변경 금지)
   const firstAllocation = workData.firstAllocationDelivery || 0;
   
-  // Stage B: 1회전 종료 후 잔여값 (분배 계산용)
+  // Stage B: 206A 1차 할당(Plan) 산출용
+  // - totalRemainingAfterFirstRound: 1회전 종료 후 "총 잔여(203D+206A)"
+  // - remaining203D: 총 잔여 중 203D에 남은 수량
   const totalRemainingAfterFirstRound = workData.totalRemainingAfterFirstRound || 0;
   const remaining203D = workData.routes?.['203D']?.firstRoundRemaining || 0;
-  
-  // ★ Stage B 입력 여부에 따른 Plan 분배 ★
-  // Stage B 입력 전: 전부 203D로 표시
-  // Stage B 입력 후: 총량을 203D/206A로 재분배 (총합 = firstAllocation 유지)
-  let giftPlan203D: number;
-  let giftPlan206A: number;
-  
-  if (totalRemainingAfterFirstRound > 0 || remaining203D > 0) {
-    // Stage B 입력됨 → 206A로 넘어가는 물량 계산
-    const remaining206A = Math.max(0, totalRemainingAfterFirstRound - remaining203D);
-    giftPlan206A = remaining206A;
-    giftPlan203D = Math.max(0, firstAllocation - giftPlan206A);
-  } else {
-    // Stage B 미입력 → 전부 203D
-    giftPlan203D = firstAllocation;
-    giftPlan206A = 0;
-  }
-  
-  // 오늘 전체 기프트 계획 (항상 firstAllocation과 일치해야 함)
+  const hasStageBInput = totalRemainingAfterFirstRound > 0 || remaining203D > 0;
+  const giftPlan206A_round1 = hasStageBInput
+    ? Math.max(0, totalRemainingAfterFirstRound - remaining203D)
+    : 0;
+
+  // Stage C: 206A carry(1회전 종료 시점에도 남아있는 206A 잔여)
+  // ⚠️ 절대 Loss(미배송 차감)로 사용 금지
+  const stageC_round1EndRemaining = workData.round1EndRemaining ?? 0;
+
+  // Stage D: 1회전 carry + 203D 2회전 신규 상차의 "합"
+  // - 203D 2회전 신규상차 = max(0, StageD_total - StageC_carry)
+  const stageD_totalRemainingWithCarry = workData.round2TotalRemaining;
+  const hasStageDInput = stageD_totalRemainingWithCarry !== undefined;
+  const giftPlan203D_round2 = hasStageDInput
+    ? Math.max(0, (stageD_totalRemainingWithCarry || 0) - stageC_round1EndRemaining)
+    : 0;
+
+  // ★ Plan 최종 구성(요구사항 고정) ★
+  // - 203D Plan = Stage A(203D 1회전 할당) + (Stage D - Stage C)
+  // - 206A Plan = Stage B로 산출된 206A 1차 할당(여기에 Stage D가 직접 더해지면 안 됨)
+  const giftPlan203D = firstAllocation + giftPlan203D_round2;
+  const giftPlan206A = giftPlan206A_round1;
+
+  // 오늘 전체 기프트 계획 (Stage D 입력 시 증가 가능)
   const todayGiftPlanTotal = giftPlan203D + giftPlan206A;
   
   // Loss: 미배송 (오직 Stage F 플로팅 입력만 사용)
@@ -159,10 +166,11 @@ export function calculateTodayIncome(
   
   // 디버그 로그
   console.log('[calculateTodayIncome] Gift calculation:', {
-    'Stage A (총량, 고정)': { firstAllocation },
-    'Stage B (분배용)': { totalRemainingAfterFirstRound, remaining203D },
-    'Plan 재분배 결과': { giftPlan203D, giftPlan206A, todayGiftPlanTotal },
-    '총량 일치 확인': todayGiftPlanTotal === firstAllocation,
+    'Stage A (203D base)': { firstAllocation },
+    'Stage B (206A round1)': { totalRemainingAfterFirstRound, remaining203D, giftPlan206A_round1 },
+    'Stage C (206A carry)': { stageC_round1EndRemaining },
+    'Stage D (total with carry)': { stageD_totalRemainingWithCarry, giftPlan203D_round2 },
+    'Plan 결과': { giftPlan203D, giftPlan206A, todayGiftPlanTotal },
     'Loss (Stage F only)': { giftLoss203D, giftLoss206A },
     giftIncome
   });
