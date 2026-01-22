@@ -108,40 +108,38 @@ export function calculateTodayIncome(
   // 1. 기프트(배송) 수입 계산
   // ================================
   // ★ 핵심 불변 규칙 ★
-  // 1) giftPlan203D = Stage A의 firstAllocationDelivery (고정, Stage B/D 잔여 영향 없음)
-  // 2) giftPlan206A = Stage C carry잔여 + Stage E 확정 분배값 (Stage B/D 값 사용 금지)
-  // 3) Stage B/D 잔여는 진행률/상태 표시용으로만 사용
-  // 4) 수입 차감(Loss)은 오직 Stage F 미배송 입력만 사용
-  //
-  // ★ Stage별 역할 정리 ★
-  // - Stage A: 203D 1회전 할당 (firstAllocationDelivery) → giftPlan203D의 유일한 소스
-  // - Stage B: 진행상태 파악용 (전체잔여/203D잔여) → Plan에 절대 사용 금지
-  // - Stage C: 206A carry 잔여 (round1EndRemaining) → 206A Plan의 carry 소스
-  // - Stage D: 2회전 전체잔여 → 진행상태 파악용, Plan 직접 귀속 금지
-  // - Stage E: 203D/206A 최종 분배 확정 시점
-  // - Stage F: 미배송 입력 → Loss 차감 유일 소스
+  // 1) 총량(firstAllocationDelivery)은 Stage B/C/D 입력으로 절대 증감 안 됨
+  // 2) Stage B 입력 후 → 총량을 203D/206A로 재분배
+  //    - remaining206A = totalRemainingAfterFirstRound - remaining203D
+  //    - giftPlan206A = remaining206A
+  //    - giftPlan203D = firstAllocation - giftPlan206A
+  // 3) 수입 차감(Loss)은 오직 Stage F 미배송 입력만 사용
   
-  // Stage A: 203D 1회전 할당 (Plan의 기준점)
+  // Stage A: 오늘 기프트 총 Plan (고정, 절대 변경 금지)
   const firstAllocation = workData.firstAllocationDelivery || 0;
   
-  // ★ giftPlan203D는 오직 Stage A 할당만 사용 (Stage B/D 잔여 영향 없음) ★
-  const giftPlan203D = firstAllocation;
+  // Stage B: 1회전 종료 후 잔여값 (분배 계산용)
+  const totalRemainingAfterFirstRound = workData.totalRemainingAfterFirstRound || 0;
+  const remaining203D = workData.routes?.['203D']?.firstRoundRemaining || 0;
   
-  // Stage C: 206A carry 잔여 (1회전 종료 시점에서 206A로 넘어가는 물량)
-  // 이 값은 "미배송 차감"이 아니라 "206A carry 할당"으로 취급
-  const stageCCarry206A = workData.round1EndRemaining || 0;
+  // ★ Stage B 입력 여부에 따른 Plan 분배 ★
+  // Stage B 입력 전: 전부 203D로 표시
+  // Stage B 입력 후: 총량을 203D/206A로 재분배 (총합 = firstAllocation 유지)
+  let giftPlan203D: number;
+  let giftPlan206A: number;
   
-  // Stage E: 2회전 추가 할당 (있는 경우만)
-  // 2회전 할당은 Stage E에서 확정되는 값으로만 계산
-  // 현재 구조에서는 Stage E 전용 할당 필드가 없으므로 0으로 처리
-  // (향후 round2Allocation 필드가 추가되면 사용)
-  const stageESecondAllocation = 0;
+  if (totalRemainingAfterFirstRound > 0 || remaining203D > 0) {
+    // Stage B 입력됨 → 206A로 넘어가는 물량 계산
+    const remaining206A = Math.max(0, totalRemainingAfterFirstRound - remaining203D);
+    giftPlan206A = remaining206A;
+    giftPlan203D = Math.max(0, firstAllocation - giftPlan206A);
+  } else {
+    // Stage B 미입력 → 전부 203D
+    giftPlan203D = firstAllocation;
+    giftPlan206A = 0;
+  }
   
-  // ★ giftPlan206A = Stage C carry + Stage E 2회전 할당 ★
-  // Stage B/D 잔여값은 여기에 절대 포함되지 않음
-  const giftPlan206A = stageCCarry206A + stageESecondAllocation;
-  
-  // 오늘 전체 기프트 계획
+  // 오늘 전체 기프트 계획 (항상 firstAllocation과 일치해야 함)
   const todayGiftPlanTotal = giftPlan203D + giftPlan206A;
   
   // Loss: 미배송 (오직 Stage F 플로팅 입력만 사용)
@@ -159,16 +157,12 @@ export function calculateTodayIncome(
     (Math.max(0, giftPlan203D - giftLoss203D) * rate203D) +
     (Math.max(0, giftPlan206A - giftLoss206A) * rate206A);
   
-  // 디버그 로그 (Stage B/D 값은 참고용으로만 표시)
-  const stageBTotalRemaining = workData.totalRemainingAfterFirstRound || 0;
-  const stageDTotalRemaining = workData.round2TotalRemaining ?? 0;
-  console.log('[calculateTodayIncome] Gift calculation (불변: B/D잔여는 Plan에 미반영):', {
-    'Stage A': { firstAllocation },
-    'Stage B (참고용, Plan미반영)': { totalRemaining: stageBTotalRemaining },
-    'Stage C (206A carry)': { stageCCarry206A },
-    'Stage D (참고용, Plan미반영)': { totalRemaining: stageDTotalRemaining },
-    'Stage E (2회전할당)': { stageESecondAllocation },
-    'Plan 결과': { giftPlan203D, giftPlan206A, todayGiftPlanTotal },
+  // 디버그 로그
+  console.log('[calculateTodayIncome] Gift calculation:', {
+    'Stage A (총량, 고정)': { firstAllocation },
+    'Stage B (분배용)': { totalRemainingAfterFirstRound, remaining203D },
+    'Plan 재분배 결과': { giftPlan203D, giftPlan206A, todayGiftPlanTotal },
+    '총량 일치 확인': todayGiftPlanTotal === firstAllocation,
     'Loss (Stage F only)': { giftLoss203D, giftLoss206A },
     giftIncome
   });
