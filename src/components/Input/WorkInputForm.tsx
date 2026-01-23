@@ -120,10 +120,27 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     });
   };
 
+  // Stage B: 엑셀식 원본값 - 206A 1차 할당(E)
+  const handleStageBGiftAlloc206AChange = (value: string) => {
+    const val = value === '' ? 0 : parseInt(value);
+    updateWorkData(date, { stageB_giftAlloc_206A: val });
+  };
+
   // Stage C 핸들러들
   const handleRound1EndRemainingChange = (value: string) => {
     const remaining = parseInt(value) || 0;
     updateWorkData(date, { round1EndRemaining: remaining });
+  };
+
+  // Stage C: 엑셀식 원본값 - 1회전 종료 잔여(F/G)
+  const handleStageCGiftRemain203DChange = (value: string) => {
+    const val = value === '' ? 0 : parseInt(value);
+    updateWorkData(date, { stageC_giftRemain_203D: val });
+  };
+
+  const handleStageCGiftRemain206AChange = (value: string) => {
+    const val = value === '' ? 0 : parseInt(value);
+    updateWorkData(date, { stageC_giftRemain_206A: val });
   };
 
   const handleFreshBagRound1EndChange = useCallback((data: FreshBagData) => {
@@ -144,6 +161,12 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const handleRound2TotalReturnsChange = (value: string) => {
     const returns = parseInt(value) || 0;
     updateWorkData(date, { round2TotalReturns: returns });
+  };
+
+  // Stage D: 엑셀식 원본값 - 2회전 출발 전 206A 잔여(K)
+  const handleStageDGiftRemain206AChange = (value: string) => {
+    const val = value === '' ? 0 : parseInt(value);
+    updateWorkData(date, { stageD_giftRemain_206A: val });
   };
 
   // Stage E 핸들러들
@@ -322,6 +345,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             workData={workData}
             onTotalRemainingChange={handleTotalRemainingChange}
             on203DRemainingChange={handle203DRemainingChange}
+            onStageBGiftAlloc206AChange={handleStageBGiftAlloc206AChange}
             onFreshBagChange={handleFreshBagChange}
             onStageBReturnRemaining203DChange={handleStageBReturnRemaining203DChange}
             onStageBUnvisitedFBTotal203DChange={handleStageBUnvisitedFBTotal203DChange}
@@ -334,6 +358,8 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             onFreshBagChange={handleFreshBagRound1EndChange}
             onRound1EndRemainingChange={handleRound1EndRemainingChange}
             onStageCReturnRemaining206AChange={handleStageCReturnRemaining206AChange}
+            onStageCGiftRemain203DChange={handleStageCGiftRemain203DChange}
+            onStageCGiftRemain206AChange={handleStageCGiftRemain206AChange}
           />
         );
       case 'D':
@@ -343,6 +369,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             onFreshBagChange={handleFreshBagChange}
             onRound2TotalRemainingChange={handleRound2TotalRemainingChange}
             onRound2TotalReturnsChange={handleRound2TotalReturnsChange}
+            onStageDGiftRemain206AChange={handleStageDGiftRemain206AChange}
           />
         );
       case 'E':

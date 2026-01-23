@@ -6,6 +6,8 @@ interface StageCProps {
   onFreshBagChange: (data: FreshBagData) => void;
   onRound1EndRemainingChange: (value: string) => void;
   onStageCReturnRemaining206AChange?: (value: string) => void;
+  onStageCGiftRemain203DChange?: (value: string) => void;
+  onStageCGiftRemain206AChange?: (value: string) => void;
 }
 
 export function StageC({
@@ -13,6 +15,8 @@ export function StageC({
   onFreshBagChange,
   onRound1EndRemainingChange,
   onStageCReturnRemaining206AChange,
+  onStageCGiftRemain203DChange,
+  onStageCGiftRemain206AChange,
 }: StageCProps) {
   const freshBag = workData.freshBag;
 
@@ -80,6 +84,42 @@ export function StageC({
           placeholder="잔여 물량 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
         />
+      </div>
+
+      {/* ★ 엑셀식 원본값: 1회전 종료 잔여(203D/206A) */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-primary/30">
+        <label className="text-xs font-medium text-primary mb-2 block">
+          1회전 종료 잔여 기프트 (203D/206A)
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">203D 잔여</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={workData.stageC_giftRemain_203D ?? ''}
+              onChange={(e) => onStageCGiftRemain203DChange?.(e.target.value.replace(/\D/g, ''))}
+              placeholder="0"
+              className="w-full h-14 px-3 text-xl font-bold text-center bg-primary/10 rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">206A 잔여</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={workData.stageC_giftRemain_206A ?? ''}
+              onChange={(e) => onStageCGiftRemain206AChange?.(e.target.value.replace(/\D/g, ''))}
+              placeholder="0"
+              className="w-full h-14 px-3 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          엑셀식 계산용 원본값(F/G). 미입력=0
+        </p>
       </div>
 
       {/* ★ 신규: 206A 잔여 반품 */}

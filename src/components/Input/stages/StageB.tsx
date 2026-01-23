@@ -4,6 +4,7 @@ interface StageBProps {
   workData: TodayWorkData;
   onTotalRemainingChange: (value: string) => void;
   on203DRemainingChange: (value: string) => void;
+  onStageBGiftAlloc206AChange?: (value: string) => void;
   onFreshBagChange: (data: FreshBagData) => void;
   onStageBReturnRemaining203DChange?: (value: string) => void;
   onStageBUnvisitedFBTotal203DChange?: (value: string) => void;
@@ -13,6 +14,7 @@ export function StageB({
   workData,
   onTotalRemainingChange,
   on203DRemainingChange,
+  onStageBGiftAlloc206AChange,
   onFreshBagChange,
   onStageBReturnRemaining203DChange,
   onStageBUnvisitedFBTotal203DChange,
@@ -84,6 +86,28 @@ export function StageB({
             </p>
           </div>
         )}
+      </div>
+
+      {/* ★ 엑셀식 원본값: 206A 1차 할당 (사용자 입력) */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-success/30">
+        <label className="text-xs font-medium text-success mb-2 block">
+          206A 1차 할당
+        </label>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.stageB_giftAlloc_206A ?? ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            onStageBGiftAlloc206AChange?.(val);
+          }}
+          placeholder="0"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-success/10 rounded-xl border-2 border-transparent focus:border-success focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          엑셀식 계산용 원본값(E). 미입력=0
+        </p>
       </div>
 
       {/* ★ 신규: 203D 잔여 반품 */}

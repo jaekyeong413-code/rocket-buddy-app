@@ -77,6 +77,12 @@ export function createDefaultDraft(date: string): DraftData {
     stageC_returnRemaining_206A: 0,
     stageE_unvisitedFB_solo_203D: 0,
     stageF_unvisitedFB_solo_206A: 0,
+
+    // Gift(배송) 엑셀식 원본 입력값 기본값
+    stageB_giftAlloc_206A: 0,
+    stageC_giftRemain_203D: 0,
+    stageC_giftRemain_206A: 0,
+    stageD_giftRemain_206A: 0,
     updatedAt: new Date().toISOString(),
     schemaVersion: CURRENT_SCHEMA_VERSION,
   };

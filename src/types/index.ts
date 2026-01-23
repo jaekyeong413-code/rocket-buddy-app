@@ -150,6 +150,15 @@ export interface TodayWorkData {
   stageC_returnRemaining_206A?: number;      // Stage C: 206A 잔여 반품
   stageE_unvisitedFB_solo_203D?: number;     // Stage E: 203D 미방문 단독 프레시백
   stageF_unvisitedFB_solo_206A?: number;     // Stage F: 206A 미방문 단독 프레시백
+
+  // ================================
+  // Gift(배송) 엑셀식 원본 입력값 (저장 ✅ / 파생값 저장 ❌)
+  // - UI 라벨은 기존을 최대한 유지하되, 내부 계산에서만 사용
+  // ================================
+  stageB_giftAlloc_206A?: number; // Stage B: E_r1_206A_alloc (206A 1차 할당 - 사용자 입력)
+  stageC_giftRemain_203D?: number; // Stage C: F_r1_203D_remain (203D 1회전 종료 잔여)
+  stageC_giftRemain_206A?: number; // Stage C: G_r1_206A_remain (206A 1회전 종료 잔여)
+  stageD_giftRemain_206A?: number; // Stage D: K_r2_206A_remain (2회전 출발 전 206A 잔여)
   
   // 플로팅 메뉴 입력 (FAB)
   freshBagNotCollected?: FreshBagNotCollectedEntry[];  // 프백 미회수 목록
