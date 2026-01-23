@@ -7,6 +7,7 @@ interface StageDProps {
   onFreshBagChange: (data: FreshBagData) => void;
   onRound2TotalRemainingChange: (value: string) => void;
   onRound2TotalReturnsChange: (value: string) => void;
+  onStageDGiftRemain206AChange?: (value: string) => void;
 }
 
 export function StageD({
@@ -14,6 +15,7 @@ export function StageD({
   onFreshBagChange,
   onRound2TotalRemainingChange,
   onRound2TotalReturnsChange,
+  onStageDGiftRemain206AChange,
 }: StageDProps) {
   const freshBag = workData.freshBag;
 
@@ -151,6 +153,25 @@ export function StageD({
           placeholder="전체 남은 물량 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
         />
+      </div>
+
+      {/* ★ 엑셀식 원본값: 2회전 출발 전 206A 잔여 */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-success/30">
+        <label className="text-xs font-medium text-success mb-2 block">
+          2회전 출발 전 206A 잔여
+        </label>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.stageD_giftRemain_206A ?? ''}
+          onChange={(e) => onStageDGiftRemain206AChange?.(e.target.value.replace(/\D/g, ''))}
+          placeholder="0"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-success/10 rounded-xl border-2 border-transparent focus:border-success focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          엑셀식 계산용 원본값(K). 미입력=0
+        </p>
       </div>
 
       {/* 반품 1차 잔여 포함 전체 반품 개수 */}
