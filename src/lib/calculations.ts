@@ -124,9 +124,15 @@ export function calculateTodayIncome(
   const totalRemainingAfterFirstRound = workData.totalRemainingAfterFirstRound || 0;
   const remaining203D = workData.routes?.['203D']?.firstRoundRemaining || 0;
   const hasStageBInput = totalRemainingAfterFirstRound > 0 || remaining203D > 0;
-  const giftPlan206A_round1 = hasStageBInput
+  // Stage B 재분배 파생값
+  // - remaining206A: 1회전 종료 시점 "총 잔여" 중 206A로 남은 수량
+  // - giftPlan206A_base: 206A Plan의 베이스(=Stage B 재분배 결과)
+  // - giftPlan203D_fromA: Stage A 총량에서 206A로 넘어간 만큼을 203D에서 차감한 결과
+  const remaining206A = hasStageBInput
     ? Math.max(0, totalRemainingAfterFirstRound - remaining203D)
     : 0;
+  const giftPlan206A_base = remaining206A;
+  const giftPlan203D_fromA = Math.max(0, firstAllocation - remaining206A);
 
   // Stage C: 206A carry(1회전 종료 시점에도 남아있는 206A 잔여)
   // ⚠️ 절대 Loss(미배송 차감)로 사용 금지
@@ -136,15 +142,16 @@ export function calculateTodayIncome(
   // - 203D 2회전 신규상차 = max(0, StageD_total - StageC_carry)
   const stageD_totalRemainingWithCarry = workData.round2TotalRemaining;
   const hasStageDInput = stageD_totalRemainingWithCarry !== undefined;
-  const giftPlan203D_round2 = hasStageDInput
+  const addTo203D = hasStageDInput
     ? Math.max(0, (stageD_totalRemainingWithCarry || 0) - stageC_round1EndRemaining)
     : 0;
 
   // ★ Plan 최종 구성(요구사항 고정) ★
-  // - 203D Plan = Stage A(203D 1회전 할당) + (Stage D - Stage C)
-  // - 206A Plan = Stage B로 산출된 206A 1차 할당(여기에 Stage D가 직접 더해지면 안 됨)
-  const giftPlan203D = firstAllocation + giftPlan203D_round2;
-  const giftPlan206A = giftPlan206A_round1;
+  // - Stage B: 203D/206A를 "재분배"(총합 = Stage A firstAllocation 유지)
+  //   giftPlan203D_fromA + giftPlan206A_base = firstAllocation
+  // - Stage D: 203D에만 "추가"(addTo203D). 206A Plan은 Stage D로 증가하면 안 됨.
+  const giftPlan203D = giftPlan203D_fromA + addTo203D;
+  const giftPlan206A = giftPlan206A_base;
 
   // 오늘 전체 기프트 계획 (Stage D 입력 시 증가 가능)
   const todayGiftPlanTotal = giftPlan203D + giftPlan206A;
@@ -167,9 +174,15 @@ export function calculateTodayIncome(
   // 디버그 로그
   console.log('[calculateTodayIncome] Gift calculation:', {
     'Stage A (203D base)': { firstAllocation },
-    'Stage B (206A round1)': { totalRemainingAfterFirstRound, remaining203D, giftPlan206A_round1 },
+    'Stage B (redistribution)': {
+      totalRemainingAfterFirstRound,
+      remaining203D,
+      remaining206A,
+      giftPlan203D_fromA,
+      giftPlan206A_base,
+    },
     'Stage C (206A carry)': { stageC_round1EndRemaining },
-    'Stage D (total with carry)': { stageD_totalRemainingWithCarry, giftPlan203D_round2 },
+    'Stage D (total with carry)': { stageD_totalRemainingWithCarry, addTo203D },
     'Plan 결과': { giftPlan203D, giftPlan206A, todayGiftPlanTotal },
     'Loss (Stage F only)': { giftLoss203D, giftLoss206A },
     giftIncome
