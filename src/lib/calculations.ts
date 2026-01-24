@@ -105,40 +105,57 @@ export function calculateTodayIncome(
   const fbStandaloneRate = settings.freshBag.standalone; // 200원
 
   // ================================
-  // 1. 기프트(배송) 수입 계산
+  // 엑셀/넘버스식 결정론적 계산
   // ================================
-  // ✅ 엑셀/넘버스 단일 산식(원본 입력값만 사용)
-  // - 중간 결과(plan/split 등) 저장 금지
-  // - Stage 입력값을 누적(add)해서 plan을 키우는 방식 금지
-  // - 수입 차감(Loss)은 오직 Stage F 미배송만 사용
-  //
-  // [저장되는 원본 입력값]
-  // C_firstTotal            = workData.firstAllocationDelivery
-  // E_r1_206A_alloc          = workData.stageB_giftAlloc_206A
-  // F_r1_203D_remain         = workData.stageC_giftRemain_203D
-  // G_r1_206A_remain         = workData.stageC_giftRemain_206A
-  // H_preR2_totalRemain      = workData.round2TotalRemaining
-  // K_r2_206A_remain         = workData.stageD_giftRemain_206A
+  // Source Input만 사용, Derived는 실시간 계산
+  // 같은 의미의 값 중복 입력 금지
+  // ================================
+
+  // [Stage A] C: 1차 전체 물량
   const C_firstTotal = workData.firstAllocationDelivery || 0;
-  const E_r1_206A_alloc = workData.stageB_giftAlloc_206A ?? 0;
-  const F_r1_203D_remain = workData.stageC_giftRemain_203D ?? 0;
-  const G_r1_206A_remain = workData.stageC_giftRemain_206A ?? 0;
-  const H_preR2_totalRemain = workData.round2TotalRemaining ?? 0;
-  const K_r2_206A_remain = workData.stageD_giftRemain_206A ?? 0;
-
-  // [파생값 - 계산만]
-  const D_r1_203D_alloc = Math.max(0, C_firstTotal - E_r1_206A_alloc);
-  const I_r2_203D_alloc = Math.max(0, H_preR2_totalRemain - K_r2_206A_remain - F_r1_203D_remain);
-  const J_r2_206A_alloc = Math.max(0, K_r2_206A_remain - G_r1_206A_remain);
-
-  // [오늘 배송 완료 기프트(수입 기준)]
-  const giftPlan203D = D_r1_203D_alloc + I_r2_203D_alloc;
-  const giftPlan206A = E_r1_206A_alloc + J_r2_206A_alloc;
-
-  const todayGiftPlanTotal = giftPlan203D + giftPlan206A;
   
-  // Loss: 미배송 (오직 Stage F 플로팅 입력만 사용)
-  // ★ Stage B/C/D/E 어떤 잔여값도 Loss로 사용 금지 ★
+  // [Stage B] G: 1회전 현재 전체 잔여
+  const G_totalRemaining = workData.totalRemainingAfterFirstRound ?? 0;
+  
+  // [Stage B] F: 203D 잔여 물량
+  const F_r1_203D_remain = workData.routes?.['203D']?.firstRoundRemaining ?? 0;
+  
+  // [Stage C] H: 1회전 종료 잔여 (있으면)
+  const H_round1EndRemaining = workData.round1EndRemaining ?? 0;
+  
+  // [Stage D] K: 2회전 출발 전 전체 남은 물량
+  const K_round2TotalRemaining = workData.round2TotalRemaining ?? 0;
+  
+  // [Stage E] M: 2회전 종료 후 전체 남은 물량 (최종)
+  const M_finalTotalRemaining = workData.round2EndRemaining ?? 0;
+
+  // ================================
+  // Derived 값 계산 (ReadOnly)
+  // ================================
+  
+  // E: 206A 1차 할당 = max(0, G - F)
+  const E_r1_206A_alloc = Math.max(0, G_totalRemaining - F_r1_203D_remain);
+  
+  // D: 203D 1차 할당 = C - E
+  const D_r1_203D_alloc = Math.max(0, C_firstTotal - E_r1_206A_alloc);
+  
+  // 2회전 신규 추가분 = K - H (또는 K - F if H=0)
+  const carryOver = H_round1EndRemaining > 0 ? H_round1EndRemaining : F_r1_203D_remain;
+  const round2NewAllocation = Math.max(0, K_round2TotalRemaining - carryOver);
+  
+  // 오늘 배송 완료 기프트 = 할당 - 최종남은
+  // 203D 완료 = D_r1_203D_alloc + round2NewAllocation - M_finalTotalRemaining (203D 부분)
+  // 206A 완료 = E_r1_206A_alloc (206A는 1차에서 완료)
+  
+  // 간단화: 전체 완료 = C + round2NewAllocation - M
+  const totalGiftPlan = C_firstTotal + round2NewAllocation;
+  const totalGiftDelivered = Math.max(0, totalGiftPlan - M_finalTotalRemaining);
+  
+  // 라우트별 분배 (206A는 1차 할당 기준, 나머지는 203D)
+  const giftPlan206A = E_r1_206A_alloc;
+  const giftPlan203D = Math.max(0, totalGiftDelivered - giftPlan206A);
+  
+  // Loss: 미배송 (Stage F 플로팅 입력만)
   const undeliveredEntries = workData.undelivered || [];
   const giftLoss203D = undeliveredEntries
     .filter(e => e.route === '203D')
@@ -152,38 +169,34 @@ export function calculateTodayIncome(
     (Math.max(0, giftPlan203D - giftLoss203D) * rate203D) +
     (Math.max(0, giftPlan206A - giftLoss206A) * rate206A);
   
-  // 디버그 로그
-  console.log('[calculateTodayIncome] Gift calculation:', {
-    inputs: {
-      C_firstTotal,
-      E_r1_206A_alloc,
-      F_r1_203D_remain,
-      G_r1_206A_remain,
-      H_preR2_totalRemain,
-      K_r2_206A_remain,
-    },
-    derived: {
-      D_r1_203D_alloc,
-      I_r2_203D_alloc,
-      J_r2_206A_alloc,
-    },
-    'Plan 결과': { giftPlan203D, giftPlan206A, todayGiftPlanTotal },
-    'Loss (Stage F only)': { giftLoss203D, giftLoss206A },
-    giftIncome
+  console.log('[calculateTodayIncome] 엑셀식 계산:', {
+    sourceInputs: { C_firstTotal, G_totalRemaining, F_r1_203D_remain, H_round1EndRemaining, K_round2TotalRemaining, M_finalTotalRemaining },
+    derived: { E_r1_206A_alloc, D_r1_203D_alloc, round2NewAllocation, totalGiftPlan, totalGiftDelivered },
+    result: { giftPlan203D, giftPlan206A, giftLoss203D, giftLoss206A, giftIncome },
   });
 
   // ================================
-  // 2. 반품 수입 계산
+  // 2. 반품 수입 계산 (라우트 분리)
   // ================================
-  // Plan: 반품 할당 = 회수 지시 = 완료로 간주
-  // 반품은 라우트 구분이 필요하지만 현재 구조상 통합 입력
-  // 반품 할당: 현재 구조에서는 라우트 분해가 불가
-  // 임의 분할 금지 원칙 → returnPlan203D에 전체 할당량 배정 (수입 계산과 동일)
+  // Source: stageB_returnRemaining_206A, round2EndReturnsRemaining
+  const returnRemaining206A = workData.stageB_returnRemaining_206A ?? 0;
+  const returnTotalFinal = workData.round2EndReturnsRemaining ?? 0;
   const returnAllocated = workData.returns?.allocated || 0;
-  const returnPlan203D = returnAllocated; // 라우트 분해 불가 → 203D에 전체 배정
-  const returnPlan206A = 0;
   
-  // Loss: 반품 미회수 (플로팅 입력)
+  // Derived: 203D 잔여 = 전체남은 - 206A잔여
+  const returnRemaining203D = Math.max(0, returnTotalFinal - returnRemaining206A);
+  
+  // 반품 완료 = 할당 - 잔여
+  const returnCompleted = Math.max(0, returnAllocated - returnTotalFinal);
+  
+  // 라우트별 완료 (비율 분배)
+  const return206ACompleted = Math.min(returnRemaining206A, returnAllocated - returnRemaining203D);
+  const return203DCompleted = Math.max(0, returnCompleted - return206ACompleted);
+  
+  const returnPlan203D = return203DCompleted;
+  const returnPlan206A = return206ACompleted;
+  
+  // Loss: 반품 미회수
   const returnNotCollectedEntries = workData.returnNotCollected || [];
   const returnLoss203D = returnNotCollectedEntries
     .filter(e => e.route === '203D')
@@ -192,21 +205,14 @@ export function calculateTodayIncome(
     .filter(e => e.route === '206A')
     .reduce((sum, e) => sum + e.quantity, 0);
   
-  // 반품 수입: 현재 구조에서는 라우트 구분 없이 평균 단가 적용
-  // 반품 할당은 있지만 라우트 분해 불가 → 보수적으로 203D 단가 적용
+  // 반품 수입 = (완료 - 미회수) * 단가
   const returnIncome = 
-    (returnAllocated * rate203D) -
-    (returnLoss203D * rate203D) -
-    (returnLoss206A * rate206A);
+    (Math.max(0, returnPlan203D - returnLoss203D) * rate203D) +
+    (Math.max(0, returnPlan206A - returnLoss206A) * rate206A);
 
-  // 디버그 로그: 반품 계산 확인 (TodayProgress와 일치해야 함)
   console.log('[calculateTodayIncome] 반품 계산:', {
-    returnAllocated,
-    returnPlan203D,
-    returnPlan206A,
-    returnLoss203D,
-    returnLoss206A,
-    returnIncome,
+    returnAllocated, returnTotalFinal, returnRemaining206A, returnRemaining203D,
+    returnPlan203D, returnPlan206A, returnLoss203D, returnLoss206A, returnIncome,
   });
 
   // ================================

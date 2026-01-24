@@ -7,7 +7,6 @@ interface StageDProps {
   onFreshBagChange: (data: FreshBagData) => void;
   onRound2TotalRemainingChange: (value: string) => void;
   onRound2TotalReturnsChange: (value: string) => void;
-  onStageDGiftRemain206AChange?: (value: string) => void;
 }
 
 export function StageD({
@@ -15,9 +14,24 @@ export function StageD({
   onFreshBagChange,
   onRound2TotalRemainingChange,
   onRound2TotalReturnsChange,
-  onStageDGiftRemain206AChange,
 }: StageDProps) {
   const freshBag = workData.freshBag;
+  const delivery203D = workData.routes['203D'];
+
+  // ================================
+  // Stage B/C 입력값 (ReadOnly 참조)
+  // ================================
+  const C_firstTotal = workData.firstAllocationDelivery || 0;
+  const G_totalRemaining = workData.totalRemainingAfterFirstRound ?? 0;
+  const F_r1_203D_remain = delivery203D.firstRoundRemaining ?? 0;
+  const E_r1_206A_alloc = Math.max(0, G_totalRemaining - F_r1_203D_remain);
+  const H_round1EndRemaining = workData.round1EndRemaining ?? 0;
+  
+  // ================================
+  // Source Input (원천값)
+  // ================================
+  // K: 2회전 출발 전 전체 남은 물량
+  const K_round2TotalRemaining = workData.round2TotalRemaining ?? 0;
 
   // 1회전 종료 시점 기준값 (Stage C에서 입력 - freshBag에 저장됨)
   const baseRegular = freshBag.round1EndRegular || 0;
@@ -65,6 +79,32 @@ export function StageD({
         <p className="text-sm font-medium text-primary text-center">
           2회전 출발 전 상차 완료 상태 입력 (프레시백은 전환 개수만 입력)
         </p>
+      </div>
+
+      {/* Stage A/B/C 입력값 요약 (ReadOnly) */}
+      <div className="bg-muted/50 rounded-2xl p-4 border border-border/30">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium text-muted-foreground">이전 단계 입력값 (참조)</span>
+          <span className="text-xs bg-muted px-2 py-0.5 rounded">ReadOnly</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-center text-sm">
+          <div className="p-2 bg-background rounded-lg">
+            <span className="text-xs text-muted-foreground block">1차전체(C)</span>
+            <span className="font-bold">{C_firstTotal}</span>
+          </div>
+          <div className="p-2 bg-background rounded-lg">
+            <span className="text-xs text-muted-foreground block">206A할당(E)</span>
+            <span className="font-bold text-success">{E_r1_206A_alloc}</span>
+          </div>
+          <div className="p-2 bg-background rounded-lg">
+            <span className="text-xs text-muted-foreground block">203D잔여(F)</span>
+            <span className="font-bold text-primary">{F_r1_203D_remain}</span>
+          </div>
+          <div className="p-2 bg-background rounded-lg">
+            <span className="text-xs text-muted-foreground block">1회전종료잔여(H)</span>
+            <span className="font-bold">{H_round1EndRemaining}</span>
+          </div>
+        </div>
       </div>
 
       {/* 프레시백 전환 */}
@@ -139,38 +179,22 @@ export function StageD({
         </div>
       </div>
 
-      {/* 1회전 잔여 포함 전체 남은 물량 */}
+      {/* Source Input: 2회전 출발 전 전체 남은 물량 (K) */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-border/30">
         <label className="text-xs font-medium text-muted-foreground mb-2 block">
-          1회전 잔여 포함 '전체 남은 물량'
+          1회전 잔여 포함 '전체 남은 물량' (K)
         </label>
         <input
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={workData.round2TotalRemaining || ''}
+          value={K_round2TotalRemaining || ''}
           onChange={(e) => onRound2TotalRemainingChange(e.target.value.replace(/\D/g, ''))}
           placeholder="전체 남은 물량 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
         />
-      </div>
-
-      {/* ★ 엑셀식 원본값: 2회전 출발 전 206A 잔여 */}
-      <div className="bg-card rounded-2xl p-5 shadow-card border border-success/30">
-        <label className="text-xs font-medium text-success mb-2 block">
-          2회전 출발 전 206A 잔여
-        </label>
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={workData.stageD_giftRemain_206A ?? ''}
-          onChange={(e) => onStageDGiftRemain206AChange?.(e.target.value.replace(/\D/g, ''))}
-          placeholder="0"
-          className="w-full h-14 px-4 text-xl font-bold text-center bg-success/10 rounded-xl border-2 border-transparent focus:border-success focus:outline-none transition-colors"
-        />
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          엑셀식 계산용 원본값(K). 미입력=0
+          2회전 출발 전(신규 상차 포함) 현재 전체 남은 물량
         </p>
       </div>
 
@@ -188,6 +212,13 @@ export function StageD({
           placeholder="전체 반품 개수 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
         />
+      </div>
+
+      {/* 안내 - 206A 잔여 입력칸 제거됨 */}
+      <div className="bg-muted/50 rounded-xl p-3">
+        <p className="text-xs text-muted-foreground text-center">
+          ※ 206A 잔여는 Stage E에서 자동 파생됩니다 (중복 입력 제거)
+        </p>
       </div>
     </div>
   );

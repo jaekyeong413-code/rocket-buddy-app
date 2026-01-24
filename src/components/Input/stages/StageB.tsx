@@ -4,7 +4,6 @@ interface StageBProps {
   workData: TodayWorkData;
   onTotalRemainingChange: (value: string) => void;
   on203DRemainingChange: (value: string) => void;
-  onStageBGiftAlloc206AChange?: (value: string) => void;
   onFreshBagChange: (data: FreshBagData) => void;
   onStageBReturnRemaining206AChange?: (value: string) => void;
   onStageBUnvisitedFBTotal203DChange?: (value: string) => void;
@@ -14,7 +13,6 @@ export function StageB({
   workData,
   onTotalRemainingChange,
   on203DRemainingChange,
-  onStageBGiftAlloc206AChange,
   onFreshBagChange,
   onStageBReturnRemaining206AChange,
   onStageBUnvisitedFBTotal203DChange,
@@ -22,12 +20,19 @@ export function StageB({
   const freshBag = workData.freshBag;
   const delivery203D = workData.routes['203D'];
   
-  // Stage B 값들
-  const totalRemaining = workData.totalRemainingAfterFirstRound ?? 0;
-  const remaining203D = delivery203D.firstRoundRemaining ?? 0;
+  // ================================
+  // Source Input (원천값)
+  // ================================
+  // G: 1회전 현재 전체 잔여 물량
+  const G_totalRemaining = workData.totalRemainingAfterFirstRound ?? 0;
+  // F: 203D 잔여 물량
+  const F_r1_203D_remain = delivery203D.firstRoundRemaining ?? 0;
   
-  // 206A 1차 할당 = 전체 잔여 - 203D 잔여
-  const allocated206A = Math.max(0, totalRemaining - remaining203D);
+  // ================================
+  // Derived (파생값 - ReadOnly)
+  // ================================
+  // E: 206A 1차 할당 = max(0, G - F)
+  const E_r1_206A_alloc = Math.max(0, G_totalRemaining - F_r1_203D_remain);
 
   return (
     <div className="space-y-4 animate-slide-up">
@@ -38,32 +43,32 @@ export function StageB({
         </p>
       </div>
 
-      {/* 1회전 현재 전체 잔여 물량 */}
+      {/* Source Input: 1회전 현재 전체 잔여 물량 (G) */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-border/30">
         <label className="text-xs font-medium text-muted-foreground mb-2 block">
-          1회전 현재 '전체 잔여 물량'
+          1회전 현재 '전체 잔여 물량' (G)
         </label>
         <input
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={totalRemaining !== 0 ? String(totalRemaining) : (workData.totalRemainingAfterFirstRound !== undefined ? String(workData.totalRemainingAfterFirstRound) : '')}
+          value={G_totalRemaining !== 0 ? String(G_totalRemaining) : (workData.totalRemainingAfterFirstRound !== undefined ? String(workData.totalRemainingAfterFirstRound) : '')}
           onChange={(e) => onTotalRemainingChange(e.target.value.replace(/\D/g, ''))}
           placeholder="전체 잔여 물량 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
         />
       </div>
 
-      {/* 203D 잔여 물량 */}
+      {/* Source Input: 203D 잔여 물량 (F) */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-primary/30">
         <label className="text-xs font-medium text-primary mb-2 block">
-          203D 잔여 물량
+          203D 잔여 물량 (F)
         </label>
         <input
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={remaining203D !== 0 ? String(remaining203D) : (delivery203D.firstRoundRemaining !== undefined ? String(delivery203D.firstRoundRemaining) : '')}
+          value={F_r1_203D_remain !== 0 ? String(F_r1_203D_remain) : (delivery203D.firstRoundRemaining !== undefined ? String(delivery203D.firstRoundRemaining) : '')}
           onChange={(e) => on203DRemainingChange(e.target.value.replace(/\D/g, ''))}
           placeholder="203D 잔여 입력 (기본값: 0)"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-primary/10 rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
@@ -71,46 +76,29 @@ export function StageB({
         <p className="text-xs text-muted-foreground mt-2 text-center">
           입력하지 않으면 기본값 0 (203D에 남길 물량 없음)
         </p>
-
-        {/* 206A 1차 할당 자동 계산 표시 */}
-        {totalRemaining > 0 && (
-          <div className="mt-3 p-3 bg-success/10 rounded-xl border border-success/20">
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-success font-medium">206A 1차 할당 (자동계산)</span>
-              <span className="text-lg font-bold text-success">
-                {allocated206A}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              = 전체잔여({totalRemaining}) - 203D잔여({remaining203D})
-            </p>
-          </div>
-        )}
       </div>
 
-      {/* ★ 엑셀식 원본값: 206A 1차 할당 (사용자 입력) */}
-      <div className="bg-card rounded-2xl p-5 shadow-card border border-success/30">
-        <label className="text-xs font-medium text-success mb-2 block">
-          206A 1차 할당
-        </label>
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={workData.stageB_giftAlloc_206A ?? ''}
-          onChange={(e) => {
-            const val = e.target.value.replace(/\D/g, '');
-            onStageBGiftAlloc206AChange?.(val);
-          }}
-          placeholder="0"
-          className="w-full h-14 px-4 text-xl font-bold text-center bg-success/10 rounded-xl border-2 border-transparent focus:border-success focus:outline-none transition-colors"
-        />
+      {/* Derived: 206A 1차 할당 (E) - ReadOnly 자동계산 */}
+      <div className="bg-success/5 rounded-2xl p-5 border border-success/30">
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-xs font-medium text-success">
+            206A 1차 할당 (자동계산)
+          </label>
+          <span className="text-xs text-muted-foreground bg-success/10 px-2 py-0.5 rounded">
+            ReadOnly
+          </span>
+        </div>
+        <div className="w-full h-14 px-4 flex items-center justify-center bg-success/10 rounded-xl border-2 border-success/20">
+          <span className="text-2xl font-bold text-success">
+            {E_r1_206A_alloc}
+          </span>
+        </div>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          엑셀식 계산용 원본값(E). 미입력=0
+          = 전체잔여(G:{G_totalRemaining}) - 203D잔여(F:{F_r1_203D_remain})
         </p>
       </div>
 
-      {/* ★ 206A 잔여 반품 (반품 수익/통계용, 배송계산 무관) */}
+      {/* Source Input: 206A 잔여 반품 - 반품 수익/통계용 */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-warning/30">
         <label className="text-xs font-medium text-warning mb-2 block">
           206A 잔여 반품
@@ -128,11 +116,11 @@ export function StageB({
           className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
         />
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          Stage B 시점 기준 206A 잔여 반품. 미입력=0
+          반품 수익/통계용. 배송 계산에 영향 없음
         </p>
       </div>
 
-      {/* ★ 신규: 203D 미방문 프레시백 */}
+      {/* Source Input: 203D 미방문 프레시백 */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-success/30">
         <label className="text-xs font-medium text-success mb-2 block">
           203D 미방문 프레시백
