@@ -6,7 +6,7 @@ interface StageBProps {
   on203DRemainingChange: (value: string) => void;
   onStageBGiftAlloc206AChange?: (value: string) => void;
   onFreshBagChange: (data: FreshBagData) => void;
-  onStageBReturnRemaining203DChange?: (value: string) => void;
+  onStageBReturnRemaining206AChange?: (value: string) => void;
   onStageBUnvisitedFBTotal203DChange?: (value: string) => void;
 }
 
@@ -16,7 +16,7 @@ export function StageB({
   on203DRemainingChange,
   onStageBGiftAlloc206AChange,
   onFreshBagChange,
-  onStageBReturnRemaining203DChange,
+  onStageBReturnRemaining206AChange,
   onStageBUnvisitedFBTotal203DChange,
 }: StageBProps) {
   const freshBag = workData.freshBag;
@@ -110,25 +110,25 @@ export function StageB({
         </p>
       </div>
 
-      {/* ★ 신규: 203D 잔여 반품 */}
+      {/* ★ 206A 잔여 반품 (반품 수익/통계용, 배송계산 무관) */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-warning/30">
         <label className="text-xs font-medium text-warning mb-2 block">
-          203D 잔여 반품
+          206A 잔여 반품
         </label>
         <input
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={workData.stageB_returnRemaining_203D ?? ''}
+          value={workData.stageB_returnRemaining_206A ?? ''}
           onChange={(e) => {
             const val = e.target.value.replace(/\D/g, '');
-            onStageBReturnRemaining203DChange?.(val);
+            onStageBReturnRemaining206AChange?.(val);
           }}
           placeholder="0"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
         />
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          Stage B 시점 기준 203D 잔여 반품. 미입력=0
+          Stage B 시점 기준 206A 잔여 반품. 미입력=0
         </p>
       </div>
 
