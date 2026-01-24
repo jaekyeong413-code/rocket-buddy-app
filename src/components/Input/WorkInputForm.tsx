@@ -7,8 +7,7 @@ import {
   formatDate, 
   createDefaultReturnsData, 
   createDefaultFreshBagData,
-  createDefaultDeliveryData,
-  calculateDailyIncome,
+  calculateTodayIncome,
   formatCurrency,
 } from '@/lib/calculations';
 import { toast } from '@/hooks/use-toast';
@@ -39,7 +38,6 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const [currentStage, setCurrentStage] = useState<StageKey>(workData.currentStage || 'A');
 
   // 편의를 위한 변수들
-  const firstAllocationDelivery = workData.firstAllocationDelivery;
   const delivery203D = workData.routes['203D'];
   const delivery206A = workData.routes['206A'];
   const returns = workData.returns;
@@ -64,18 +62,19 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     updateWorkData(date, { currentStage: stage });
   };
 
-  // Stage A 핸들러들 - 50% 분배 제거, 203D만 할당
+  // ================================
+  // Stage A 핸들러들
+  // ================================
   const handleFirstAllocationDeliveryChange = (value: string) => {
     const total = parseInt(value) || 0;
     
-    // Stage A: 배송 1차 전체 물량 = 203D 1회전 할당
-    // 206A는 Stage B에서 계산됨
+    // Stage A: 배송 1차 전체 물량 = 203D 1회전 할당 (C_firstTotal)
     updateWorkData(date, {
       firstAllocationDelivery: total,
       routes: {
         ...workData.routes,
         '203D': { ...delivery203D, allocated: total },
-        '206A': { ...delivery206A, allocated: 0 }, // Stage B에서 설정
+        '206A': { ...delivery206A, allocated: 0 },
       },
     });
   };
@@ -92,95 +91,33 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     updateWorkData(date, { freshBag: data });
   }, [date, updateWorkData]);
 
+  // ================================
   // Stage B 핸들러들
+  // ================================
+  // G: 1회전 현재 전체 잔여 물량
   const handleTotalRemainingChange = (value: string) => {
-    // 빈 문자열이면 0, 아니면 파싱 (0도 유효한 값으로 처리)
     const remaining = value === '' ? 0 : parseInt(value);
     updateWorkData(date, { totalRemainingAfterFirstRound: remaining });
   };
 
+  // F: 203D 잔여 물량
   const handle203DRemainingChange = (value: string) => {
-    // 빈 문자열이면 0, 아니면 파싱 (0도 유효한 값으로 처리)
     const remaining203D = value === '' ? 0 : parseInt(value);
     const totalRemaining = workData.totalRemainingAfterFirstRound || 0;
     
     // 클램프: 0 ~ totalRemaining 범위
     const clampedRemaining203D = Math.max(0, Math.min(remaining203D, totalRemaining));
     
-    // 206A 1차 할당 = 전체 잔여 - 203D 잔여
-    const allocated206A = Math.max(0, totalRemaining - clampedRemaining203D);
-    
-    // SET 방식: 입력값으로 직접 대체 (누적 아님)
+    // routes['203D'].firstRoundRemaining에 저장
     updateWorkData(date, {
       routes: {
         ...workData.routes,
         '203D': { ...delivery203D, firstRoundRemaining: clampedRemaining203D },
-        '206A': { ...delivery206A, allocated: allocated206A, firstRoundRemaining: 0 },
       },
     });
   };
 
-  // Stage B: 엑셀식 원본값 - 206A 1차 할당(E)
-  const handleStageBGiftAlloc206AChange = (value: string) => {
-    const val = value === '' ? 0 : parseInt(value);
-    updateWorkData(date, { stageB_giftAlloc_206A: val });
-  };
-
-  // Stage C 핸들러들
-  const handleRound1EndRemainingChange = (value: string) => {
-    const remaining = parseInt(value) || 0;
-    updateWorkData(date, { round1EndRemaining: remaining });
-  };
-
-  // Stage C: 엑셀식 원본값 - 1회전 종료 잔여(F/G)
-  const handleStageCGiftRemain203DChange = (value: string) => {
-    const val = value === '' ? 0 : parseInt(value);
-    updateWorkData(date, { stageC_giftRemain_203D: val });
-  };
-
-  const handleStageCGiftRemain206AChange = (value: string) => {
-    const val = value === '' ? 0 : parseInt(value);
-    updateWorkData(date, { stageC_giftRemain_206A: val });
-  };
-
-  const handleFreshBagRound1EndChange = useCallback((data: FreshBagData) => {
-    // Stage C에서 프레시백 잔여 입력 시 workData에도 저장
-    updateWorkData(date, { 
-      freshBag: data,
-      freshBagRound1EndRegular: data.round1EndRegular || 0,
-      freshBagRound1EndStandalone: data.round1EndStandalone || 0,
-    });
-  }, [date, updateWorkData]);
-
-  // Stage D 핸들러들
-  const handleRound2TotalRemainingChange = (value: string) => {
-    const remaining = parseInt(value) || 0;
-    updateWorkData(date, { round2TotalRemaining: remaining });
-  };
-
-  const handleRound2TotalReturnsChange = (value: string) => {
-    const returns = parseInt(value) || 0;
-    updateWorkData(date, { round2TotalReturns: returns });
-  };
-
-  // Stage D: 엑셀식 원본값 - 2회전 출발 전 206A 잔여(K)
-  const handleStageDGiftRemain206AChange = (value: string) => {
-    const val = value === '' ? 0 : parseInt(value);
-    updateWorkData(date, { stageD_giftRemain_206A: val });
-  };
-
-  // Stage E 핸들러들
-  const handleRound2RemainingChange = (value: string) => {
-    const remaining = parseInt(value) || 0;
-    updateWorkData(date, { round2EndRemaining: remaining });
-  };
-
-  const handleRound2ReturnsRemainingChange = (value: string) => {
-    const remaining = parseInt(value) || 0;
-    updateWorkData(date, { round2EndReturnsRemaining: remaining });
-  };
-
-  // ★ 신규 필드 핸들러
+  // 206A 잔여 반품 (반품 수익/통계용)
   const handleStageBReturnRemaining206AChange = (value: string) => {
     const val = parseInt(value) || 0;
     updateWorkData(date, { stageB_returnRemaining_206A: val });
@@ -191,9 +128,50 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     updateWorkData(date, { stageB_unvisitedFB_total_203D: val });
   };
 
-  const handleStageCReturnRemaining206AChange = (value: string) => {
-    const val = parseInt(value) || 0;
-    updateWorkData(date, { stageC_returnRemaining_206A: val });
+  // ================================
+  // Stage C 핸들러들
+  // ================================
+  // H: 1회전 종료 시점 잔여 물량
+  const handleRound1EndRemainingChange = (value: string) => {
+    const remaining = parseInt(value) || 0;
+    updateWorkData(date, { round1EndRemaining: remaining });
+  };
+
+  const handleFreshBagRound1EndChange = useCallback((data: FreshBagData) => {
+    updateWorkData(date, { 
+      freshBag: data,
+      freshBagRound1EndRegular: data.round1EndRegular || 0,
+      freshBagRound1EndStandalone: data.round1EndStandalone || 0,
+    });
+  }, [date, updateWorkData]);
+
+  // ================================
+  // Stage D 핸들러들
+  // ================================
+  // K: 2회전 출발 전 전체 남은 물량
+  const handleRound2TotalRemainingChange = (value: string) => {
+    const remaining = parseInt(value) || 0;
+    updateWorkData(date, { round2TotalRemaining: remaining });
+  };
+
+  const handleRound2TotalReturnsChange = (value: string) => {
+    const returns = parseInt(value) || 0;
+    updateWorkData(date, { round2TotalReturns: returns });
+  };
+
+  // ================================
+  // Stage E 핸들러들
+  // ================================
+  // M: 2회전 종료 후 전체 남은 물량
+  const handleRound2RemainingChange = (value: string) => {
+    const remaining = parseInt(value) || 0;
+    updateWorkData(date, { round2EndRemaining: remaining });
+  };
+
+  // returnTotalFinal: 전체 남은 반품
+  const handleRound2ReturnsRemainingChange = (value: string) => {
+    const remaining = parseInt(value) || 0;
+    updateWorkData(date, { round2EndReturnsRemaining: remaining });
   };
 
   const handleStageEUnvisitedFBSolo203DChange = (value: string) => {
@@ -201,94 +179,44 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     updateWorkData(date, { stageE_unvisitedFB_solo_203D: val });
   };
 
+  // ================================
+  // Stage F 핸들러들
+  // ================================
   const handleStageFUnvisitedFBSolo206AChange = (value: string) => {
     const val = parseInt(value) || 0;
     updateWorkData(date, { stageF_unvisitedFB_solo_206A: val });
   };
 
-  // 오늘 예상 수입 실시간 계산
-  const todayRecords = records.filter(r => r.date === date);
-  const currentInputAsRecords: WorkRecord[] = [];
-  
-  // ★ Stage A: 배송 1차 전체 물량 (= 203D 1회전 할당)
-  const firstAllocation = workData.firstAllocationDelivery || 0;
-  
-  // ★ Stage B: 1회전 현재 '전체 잔여 물량'
-  const totalRemaining = workData.totalRemainingAfterFirstRound || 0;
-  
-  // ★ Stage B: 203D 잔여 물량
-  const remaining203D = delivery203D.firstRoundRemaining || 0;
-  
-  // ★ 핵심 계산: 203D 실제 처리량 = firstAllocation - totalRemaining
-  const delivered203D = Math.max(0, firstAllocation - totalRemaining);
-  
-  // ★ 206A 할당 = totalRemaining - remaining203D
-  const allocated206A = Math.max(0, totalRemaining - remaining203D);
-  
-  // 미배송 수량 계산 (수입 차감용)
+  // ================================
+  // 실시간 예상 수입 계산 (엑셀식 단일 계산)
+  // ================================
+  const incomeBreakdown = calculateTodayIncome(workData, settings);
+  const estimatedIncome = incomeBreakdown.totalIncome;
+
+  // 미배송 수량 계산 (저장용)
   const undeliveredByRoute = (workData.undelivered || []).reduce((acc, entry) => {
     acc[entry.route] = (acc[entry.route] || 0) + entry.quantity;
     return acc;
   }, {} as Record<string, number>);
-  
-  const has203DData = delivered203D > 0;
-  const has206AData = allocated206A > 0;
-  
-  // 203D 레코드 생성 - ★ allocated에 실제 처리량(delivered203D) 사용
-  if (has203DData) {
-    currentInputAsRecords.push({
-      id: 'temp-203d',
-      date,
-      route: '203D',
-      round: 1,
-      delivery: {
-        ...delivery203D,
-        allocated: delivered203D, // ★ 할당이 아니라 실제 처리량
-        cancelled: undeliveredByRoute['203D'] || 0,
-      },
-      returns,
-      freshBag,
-    });
-  }
-  
-  // 206A 레코드 생성
-  if (has206AData) {
-    currentInputAsRecords.push({
-      id: 'temp-206a',
-      date,
-      route: '206A',
-      round: 1,
-      delivery: {
-        ...delivery206A,
-        allocated: allocated206A,
-        cancelled: undeliveredByRoute['206A'] || 0,
-      },
-      returns: createDefaultReturnsData(),
-      freshBag: createDefaultFreshBagData(),
-    });
-  }
-
-  // 채번 수입 계산 (라우트별 단가 적용)
-  const numberedIncome = (workData.numbered || []).reduce((sum, entry) => {
-    return sum + (settings.routes[entry.route] * entry.quantity);
-  }, 0);
-
-  const estimatedIncome = calculateDailyIncome([...todayRecords, ...currentInputAsRecords], settings) + numberedIncome;
 
   const handleSubmit = () => {
-    // 할당량 학습 데이터 저장 - ★ 실제 처리량 사용
-    if (delivered203D > 0 || allocated206A > 0) {
+    // 엑셀식 계산 결과 사용
+    const giftPlan203D = incomeBreakdown.giftPlan203D;
+    const giftPlan206A = incomeBreakdown.giftPlan206A;
+    
+    // 할당량 학습 데이터 저장
+    if (giftPlan203D > 0 || giftPlan206A > 0) {
       addAllocationHistory({
         date,
         allocations: {
-          '203D': delivered203D,
-          '206A': allocated206A,
+          '203D': giftPlan203D,
+          '206A': giftPlan206A,
         },
       });
     }
 
-    // 203D 라우트 저장 - ★ 실제 처리량 사용
-    if (delivered203D > 0) {
+    // 203D 라우트 저장
+    if (giftPlan203D > 0) {
       const record203D: WorkRecord = {
         id: `${date}-203D-1-${Date.now()}`,
         date,
@@ -296,7 +224,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         round: 1,
         delivery: {
           ...delivery203D,
-          allocated: delivered203D, // ★ 실제 처리량
+          allocated: giftPlan203D,
           cancelled: undeliveredByRoute['203D'] || 0,
         },
         returns: returns,
@@ -306,7 +234,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     }
 
     // 206A 라우트 저장
-    if (allocated206A > 0) {
+    if (giftPlan206A > 0) {
       const record206A: WorkRecord = {
         id: `${date}-206A-1-${Date.now() + 1}`,
         date,
@@ -314,7 +242,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         round: 1,
         delivery: {
           ...delivery206A,
-          allocated: allocated206A,
+          allocated: giftPlan206A,
           cancelled: undeliveredByRoute['206A'] || 0,
         },
         returns: createDefaultReturnsData(),
@@ -345,7 +273,6 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             workData={workData}
             onTotalRemainingChange={handleTotalRemainingChange}
             on203DRemainingChange={handle203DRemainingChange}
-            onStageBGiftAlloc206AChange={handleStageBGiftAlloc206AChange}
             onFreshBagChange={handleFreshBagChange}
             onStageBReturnRemaining206AChange={handleStageBReturnRemaining206AChange}
             onStageBUnvisitedFBTotal203DChange={handleStageBUnvisitedFBTotal203DChange}
@@ -357,9 +284,6 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             workData={workData}
             onFreshBagChange={handleFreshBagRound1EndChange}
             onRound1EndRemainingChange={handleRound1EndRemainingChange}
-            onStageCReturnRemaining206AChange={handleStageCReturnRemaining206AChange}
-            onStageCGiftRemain203DChange={handleStageCGiftRemain203DChange}
-            onStageCGiftRemain206AChange={handleStageCGiftRemain206AChange}
           />
         );
       case 'D':
@@ -369,7 +293,6 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             onFreshBagChange={handleFreshBagChange}
             onRound2TotalRemainingChange={handleRound2TotalRemainingChange}
             onRound2TotalReturnsChange={handleRound2TotalReturnsChange}
-            onStageDGiftRemain206AChange={handleStageDGiftRemain206AChange}
           />
         );
       case 'E':
@@ -402,6 +325,12 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
         <div className="flex items-center justify-between">
           <span className="text-sm opacity-80">오늘 예상 수입</span>
           <span className="text-2xl font-bold">{formatCurrency(estimatedIncome)}</span>
+        </div>
+        {/* 간략 상태 표시 */}
+        <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+          <span>203D: {incomeBreakdown.giftPlan203D}건</span>
+          <span>206A: {incomeBreakdown.giftPlan206A}건</span>
+          <span>반품: {incomeBreakdown.returnPlan203D + incomeBreakdown.returnPlan206A}건</span>
         </div>
       </div>
 

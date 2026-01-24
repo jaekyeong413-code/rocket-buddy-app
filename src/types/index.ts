@@ -121,12 +121,54 @@ export interface NumberedEntry {
   createdAt: string;
 }
 
-// 오늘의 작업 데이터 (저장 전 상태 - 항상 표시)
+// ================================
+// 오늘의 작업 데이터 (TodayWorkData)
+// ================================
+// 엑셀/넘버스 강제 원칙:
+// 1) Source Input: 각 의미당 1개 입력칸만 존재
+// 2) Derived: 전부 ReadOnly, 실시간 계산
+// 3) 같은 의미의 값을 다른 스테이지에서 다시 입력 금지
+// ================================
 export interface TodayWorkData {
   date: string;
-  firstAllocationDelivery: number; // 1차 할당 배송
-  firstAllocationReturns: number; // 1차 할당 반품
-  totalRemainingAfterFirstRound: number; // 1회전 잔여 포함 전체 남은 물량
+  
+  // ================================
+  // Source Input (원천값) - 사용자가 직접 입력
+  // ================================
+  
+  // [Stage A] 배송/기프트 1차 전체 물량 (= C_firstTotal)
+  firstAllocationDelivery: number;
+  
+  // [Stage A] 반품 1차 할당
+  firstAllocationReturns: number;
+  
+  // [Stage B] 1회전 현재 '전체 잔여 물량' (= G_totalRemainingR1)
+  totalRemainingAfterFirstRound: number;
+  
+  // [Stage B] 203D 잔여 물량 (= F_r1_203D_remain)
+  // → routes['203D'].firstRoundRemaining에 저장
+  
+  // [Stage B] 206A 잔여 반품 - 반품 수익/통계용 (배송 계산 무관)
+  stageB_returnRemaining_206A?: number;
+  
+  // [Stage C] 1회전 종료 시점 잔여 물량 (= H_round1EndRemaining) - 있으면 입력
+  round1EndRemaining?: number;
+  
+  // [Stage D] 2회전 출발 전 '전체 남은 물량' (= K_round2TotalRemaining)
+  round2TotalRemaining?: number;
+  
+  // [Stage D] 2회전 전체 반품
+  round2TotalReturns?: number;
+  
+  // [Stage E] 203D 2회전 종료 후 '전체 남은 물량' (= M_finalTotalRemaining)
+  round2EndRemaining?: number;
+  
+  // [Stage E] 전체 남은 반품 (= returnTotalFinal)
+  round2EndReturnsRemaining?: number;
+  
+  // ================================
+  // 라우트 데이터 (내부 저장용)
+  // ================================
   routes: {
     '203D': DeliveryData;
     '206A': DeliveryData;
@@ -134,37 +176,36 @@ export interface TodayWorkData {
   returns: ReturnsData;
   freshBag: FreshBagData;
   
-  // 단계별 추가 필드
+  // ================================
+  // 단계 추적
+  // ================================
   currentStage?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+  
+  // ================================
+  // 프레시백 관련 Source Input
+  // ================================
   freshBagRound1EndRegular?: number;    // Stage C: 1회전 종료 일반 잔여
   freshBagRound1EndStandalone?: number; // Stage C: 1회전 종료 단독 잔여
-  round1EndRemaining?: number;          // Stage C: 1회전 종료 잔여 물량
-  round2TotalRemaining?: number;        // Stage D: 2회전 전체 잔여
-  round2TotalReturns?: number;          // Stage D: 2회전 전체 반품
-  round2EndRemaining?: number;          // Stage E: 2회전 종료 잔여
-  round2EndReturnsRemaining?: number;   // Stage E: 2회전 종료 반품 잔여
-  
-  // ★ 신규 5개 필드: 라우트별 원천 데이터
-  stageB_returnRemaining_206A?: number;      // Stage B: 206A 잔여 반품 (반품 수익/통계용, 배송계산 무관)
   stageB_unvisitedFB_total_203D?: number;    // Stage B: 203D 미방문 프레시백 총량
-  stageC_returnRemaining_206A?: number;      // Stage C: 206A 잔여 반품
   stageE_unvisitedFB_solo_203D?: number;     // Stage E: 203D 미방문 단독 프레시백
   stageF_unvisitedFB_solo_206A?: number;     // Stage F: 206A 미방문 단독 프레시백
-
-  // ================================
-  // Gift(배송) 엑셀식 원본 입력값 (저장 ✅ / 파생값 저장 ❌)
-  // - UI 라벨은 기존을 최대한 유지하되, 내부 계산에서만 사용
-  // ================================
-  stageB_giftAlloc_206A?: number; // Stage B: E_r1_206A_alloc (206A 1차 할당 - 사용자 입력)
-  stageC_giftRemain_203D?: number; // Stage C: F_r1_203D_remain (203D 1회전 종료 잔여)
-  stageC_giftRemain_206A?: number; // Stage C: G_r1_206A_remain (206A 1회전 종료 잔여)
-  stageD_giftRemain_206A?: number; // Stage D: K_r2_206A_remain (2회전 출발 전 206A 잔여)
   
-  // 플로팅 메뉴 입력 (FAB)
+  // ================================
+  // 플로팅 메뉴 입력 (FAB) - Loss/Extra
+  // ================================
   freshBagNotCollected?: FreshBagNotCollectedEntry[];  // 프백 미회수 목록
   returnNotCollected?: ReturnNotCollectedEntry[];      // 반품 미회수 목록
-  undelivered?: UndeliveredEntry[];                    // 미배송 목록
-  numbered?: NumberedEntry[];                          // 채번 목록
+  undelivered?: UndeliveredEntry[];                    // 미배송 목록 (Loss)
+  numbered?: NumberedEntry[];                          // 채번 목록 (Extra)
+  
+  // ================================
+  // DEPRECATED (제거 예정 - 엑셀식으로 대체됨)
+  // ================================
+  stageB_giftAlloc_206A?: number;      // 제거됨: Derived로 대체
+  stageC_giftRemain_203D?: number;     // 제거됨: 중복 입력 금지
+  stageC_giftRemain_206A?: number;     // 제거됨: 중복 입력 금지
+  stageD_giftRemain_206A?: number;     // 제거됨: Stage E에서 파생
+  stageC_returnRemaining_206A?: number; // 제거됨: stageB_returnRemaining_206A로 통합
 }
 
 export interface DailyStats {
