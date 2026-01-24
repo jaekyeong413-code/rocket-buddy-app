@@ -145,7 +145,7 @@ export interface TodayWorkData {
   round2EndReturnsRemaining?: number;   // Stage E: 2회전 종료 반품 잔여
   
   // ★ 신규 5개 필드: 라우트별 원천 데이터
-  stageB_returnRemaining_203D?: number;      // Stage B: 203D 잔여 반품
+  stageB_returnRemaining_206A?: number;      // Stage B: 206A 잔여 반품 (반품 수익/통계용, 배송계산 무관)
   stageB_unvisitedFB_total_203D?: number;    // Stage B: 203D 미방문 프레시백 총량
   stageC_returnRemaining_206A?: number;      // Stage C: 206A 잔여 반품
   stageE_unvisitedFB_solo_203D?: number;     // Stage E: 203D 미방문 단독 프레시백

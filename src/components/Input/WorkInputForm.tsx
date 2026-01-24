@@ -180,10 +180,10 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     updateWorkData(date, { round2EndReturnsRemaining: remaining });
   };
 
-  // ★ 신규 5개 필드 핸들러
-  const handleStageBReturnRemaining203DChange = (value: string) => {
+  // ★ 신규 필드 핸들러
+  const handleStageBReturnRemaining206AChange = (value: string) => {
     const val = parseInt(value) || 0;
-    updateWorkData(date, { stageB_returnRemaining_203D: val });
+    updateWorkData(date, { stageB_returnRemaining_206A: val });
   };
 
   const handleStageBUnvisitedFBTotal203DChange = (value: string) => {
@@ -347,7 +347,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             on203DRemainingChange={handle203DRemainingChange}
             onStageBGiftAlloc206AChange={handleStageBGiftAlloc206AChange}
             onFreshBagChange={handleFreshBagChange}
-            onStageBReturnRemaining203DChange={handleStageBReturnRemaining203DChange}
+            onStageBReturnRemaining206AChange={handleStageBReturnRemaining206AChange}
             onStageBUnvisitedFBTotal203DChange={handleStageBUnvisitedFBTotal203DChange}
           />
         );

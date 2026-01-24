@@ -72,7 +72,7 @@ export function createDefaultDraft(date: string): DraftData {
     returns: createDefaultReturnsData(),
     freshBag: createDefaultFreshBagData(),
     // ★ 신규 5개 필드 기본값
-    stageB_returnRemaining_203D: 0,
+    stageB_returnRemaining_206A: 0,
     stageB_unvisitedFB_total_203D: 0,
     stageC_returnRemaining_206A: 0,
     stageE_unvisitedFB_solo_203D: 0,
