@@ -28,6 +28,28 @@ export function StageA({
         </p>
       </div>
 
+      {/* Source Input: 1차 배송 전체 물량 */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-primary/30">
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-xs font-medium text-primary">
+            1차 배송 전체 물량 (firstDeliveryTotal)
+          </label>
+          <span className="text-xs bg-primary/10 px-2 py-0.5 rounded text-primary">Source</span>
+        </div>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.firstAllocationDelivery || ''}
+          onChange={(e) => onFirstAllocationDeliveryChange(e.target.value.replace(/\D/g, ''))}
+          placeholder="203D + 206A 전체 물량 입력"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          1차 배송 전체 수량 (203D + 206A 합계)
+        </p>
+      </div>
+
       {/* 프레시백 시작값 */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-success/30">
         <div className="flex items-center gap-2 mb-4">
@@ -101,25 +123,6 @@ export function StageA({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* 배송 1차 전체 물량 - 203D 1회전 할당으로 간주 */}
-      <div className="bg-card rounded-2xl p-5 shadow-card border border-primary/30">
-        <label className="text-xs font-medium text-primary mb-2 block">
-          배송 1차 전체 물량 (= 203D 1회전 할당)
-        </label>
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={workData.firstAllocationDelivery || ''}
-          onChange={(e) => onFirstAllocationDeliveryChange(e.target.value.replace(/\D/g, ''))}
-          placeholder="203D 1회전 배송 할당량 입력"
-          className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
-        />
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          이 값이 203D 1회전 할당 물량으로 사용됩니다
-        </p>
       </div>
 
       {/* 반품 1차 전체 물량 */}

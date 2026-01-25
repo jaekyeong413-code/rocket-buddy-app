@@ -105,57 +105,71 @@ export function calculateTodayIncome(
   const fbStandaloneRate = settings.freshBag.standalone; // 200원
 
   // ================================
-  // 엑셀/넘버스식 결정론적 계산
+  // 엑셀/넘버스식 결정론적 계산 (단일 계산 흐름)
   // ================================
-  // Source Input만 사용, Derived는 실시간 계산
-  // 같은 의미의 값 중복 입력 금지
+  // Source Input: 사용자가 직접 입력하는 값만
+  // Derived: 입력값 변경 시 즉시 재계산 (ReadOnly)
+  // 계산 순서: 전체 → 분리 → 차감
   // ================================
 
-  // [Stage A] C: 1차 전체 물량
-  const C_firstTotal = workData.firstAllocationDelivery || 0;
+  // ================================
+  // 1. Source Input (원천값) - 배송(기프트)
+  // ================================
+  // firstDeliveryTotal: 1차 배송 전체 물량 (아침 상차 후 입력)
+  const firstDeliveryTotal = workData.firstAllocationDelivery || 0;
   
-  // [Stage B] G: 1회전 현재 전체 잔여
-  const G_totalRemaining = workData.totalRemainingAfterFirstRound ?? 0;
+  // firstRoundEndTotalRemaining: 1회전 종료 시 전체 잔여 (1회전 종료 직후 입력)
+  // Stage B의 G 또는 Stage C의 H 중 마지막 입력값 사용
+  const firstRoundEndTotalRemaining = workData.round1EndRemaining ?? workData.totalRemainingAfterFirstRound ?? 0;
   
-  // [Stage B] F: 203D 잔여 물량
-  const F_r1_203D_remain = workData.routes?.['203D']?.firstRoundRemaining ?? 0;
-  
-  // [Stage C] H: 1회전 종료 잔여 (있으면)
-  const H_round1EndRemaining = workData.round1EndRemaining ?? 0;
-  
-  // [Stage D] K: 2회전 출발 전 전체 남은 물량
-  const K_round2TotalRemaining = workData.round2TotalRemaining ?? 0;
-  
-  // [Stage E] M: 2회전 종료 후 전체 남은 물량 (최종)
-  const M_finalTotalRemaining = workData.round2EndRemaining ?? 0;
+  // secondRoundEndTotalRemaining: 2회전 종료 후 전체 잔여 (2회전 종료 직후 입력)
+  const secondRoundEndTotalRemaining = workData.round2EndRemaining ?? 0;
 
   // ================================
-  // Derived 값 계산 (ReadOnly)
+  // 2. Derived (파생값) - 배송(기프트)
   // ================================
+  // firstRoundDeliveredTotal: 1회전 실제 배송 완료 = 1차전체 - 1회전종료잔여
+  const firstRoundDeliveredTotal = Math.max(0, firstDeliveryTotal - firstRoundEndTotalRemaining);
   
-  // E: 206A 1차 할당 = max(0, G - F)
-  const E_r1_206A_alloc = Math.max(0, G_totalRemaining - F_r1_203D_remain);
+  // secondRoundStartTotal: 2회전 시작 물량 = 1회전 종료 잔여
+  const secondRoundStartTotal = firstRoundEndTotalRemaining;
   
-  // D: 203D 1차 할당 = C - E
-  const D_r1_203D_alloc = Math.max(0, C_firstTotal - E_r1_206A_alloc);
+  // 2회전 추가 물량 (Stage D에서 입력한 값 - 1회전 잔여)
+  const round2TotalRemaining = workData.round2TotalRemaining ?? 0;
+  const secondRoundNewAllocation = Math.max(0, round2TotalRemaining - firstRoundEndTotalRemaining);
+  const secondRoundTotalStart = secondRoundStartTotal + secondRoundNewAllocation;
   
-  // 2회전 신규 추가분 = K - H (또는 K - F if H=0)
-  const carryOver = H_round1EndRemaining > 0 ? H_round1EndRemaining : F_r1_203D_remain;
-  const round2NewAllocation = Math.max(0, K_round2TotalRemaining - carryOver);
+  // secondRoundDeliveredTotal: 2회전 실제 배송 완료 = 2회전시작 - 2회전종료잔여
+  const secondRoundDeliveredTotal = Math.max(0, secondRoundTotalStart - secondRoundEndTotalRemaining);
   
-  // 오늘 배송 완료 기프트 = 할당 - 최종남은
-  // 203D 완료 = D_r1_203D_alloc + round2NewAllocation - M_finalTotalRemaining (203D 부분)
-  // 206A 완료 = E_r1_206A_alloc (206A는 1차에서 완료)
+  // todayDeliveredTotal: 오늘 전체 배송 완료 = 1회전완료 + 2회전완료
+  const todayDeliveredTotal = firstRoundDeliveredTotal + secondRoundDeliveredTotal;
+
+  // ================================
+  // 3. 노선별 배송 분리 (Derived)
+  // ================================
+  // 1차 배송: 사전 할당 기준 (Stage B의 F값 사용)
+  const firstRound203DRemaining = workData.routes?.['203D']?.firstRoundRemaining ?? 0;
   
-  // 간단화: 전체 완료 = C + round2NewAllocation - M
-  const totalGiftPlan = C_firstTotal + round2NewAllocation;
-  const totalGiftDelivered = Math.max(0, totalGiftPlan - M_finalTotalRemaining);
+  // 206A 1차 할당 = 전체잔여(G) - 203D잔여(F) — 단, 이 값은 참조용
+  // 하지만 실제 배송 완료 계산은 "전체 - 잔여" 원칙 준수
   
-  // 라우트별 분배 (206A는 1차 할당 기준, 나머지는 203D)
-  const giftPlan206A = E_r1_206A_alloc;
-  const giftPlan203D = Math.max(0, totalGiftDelivered - giftPlan206A);
+  // 1회전 배송 분리: 203D 완료 = 1차할당 - 203D잔여
+  const first203DAllocated = firstDeliveryTotal; // Stage A에서 입력한 값이 203D 할당
+  const first203DDelivered = Math.max(0, first203DAllocated - firstRound203DRemaining);
   
-  // Loss: 미배송 (Stage F 플로팅 입력만)
+  // 206A 1회전 완료: 전체 1회전 완료 - 203D 완료
+  const first206ADelivered = Math.max(0, firstRoundDeliveredTotal - first203DDelivered);
+  
+  // 2회전: 203D에서만 배송 (206A는 1회전에서 완료)
+  const second203DDelivered = secondRoundDeliveredTotal;
+  const second206ADelivered = 0;
+  
+  // 오늘 노선별 완료
+  const giftPlan203D = first203DDelivered + second203DDelivered;
+  const giftPlan206A = first206ADelivered + second206ADelivered;
+  
+  // Loss: 미배송 (Stage F 플로팅 입력)
   const undeliveredEntries = workData.undelivered || [];
   const giftLoss203D = undeliveredEntries
     .filter(e => e.route === '203D')
@@ -164,15 +178,26 @@ export function calculateTodayIncome(
     .filter(e => e.route === '206A')
     .reduce((sum, e) => sum + e.quantity, 0);
   
-  // 기프트 수입 = (Plan - Loss) * 단가
+  // 기프트 수입 = (완료 - Loss) * 단가
   const giftIncome = 
     (Math.max(0, giftPlan203D - giftLoss203D) * rate203D) +
     (Math.max(0, giftPlan206A - giftLoss206A) * rate206A);
   
-  console.log('[calculateTodayIncome] 엑셀식 계산:', {
-    sourceInputs: { C_firstTotal, G_totalRemaining, F_r1_203D_remain, H_round1EndRemaining, K_round2TotalRemaining, M_finalTotalRemaining },
-    derived: { E_r1_206A_alloc, D_r1_203D_alloc, round2NewAllocation, totalGiftPlan, totalGiftDelivered },
-    result: { giftPlan203D, giftPlan206A, giftLoss203D, giftLoss206A, giftIncome },
+  console.log('[calculateTodayIncome] 엑셀식 배송 계산:', {
+    sourceInputs: { firstDeliveryTotal, firstRoundEndTotalRemaining, secondRoundEndTotalRemaining, round2TotalRemaining },
+    derived: { 
+      firstRoundDeliveredTotal, 
+      secondRoundStartTotal, 
+      secondRoundNewAllocation,
+      secondRoundDeliveredTotal, 
+      todayDeliveredTotal 
+    },
+    routeSplit: {
+      first203DDelivered, first206ADelivered,
+      second203DDelivered, second206ADelivered,
+      giftPlan203D, giftPlan206A
+    },
+    result: { giftLoss203D, giftLoss206A, giftIncome },
   });
 
   // ================================
@@ -282,8 +307,8 @@ export function calculateTodayIncome(
   let status: 'complete' | 'partial' | 'incomplete' = 'incomplete';
   let statusMessage: string | undefined;
   
-  // 상태 판단(표시용): 엑셀식 입력에서는 C_firstTotal만 있어도 Plan이 즉시 산출됨
-  if (C_firstTotal > 0) {
+  // 상태 판단(표시용): 엑셀식 입력에서는 firstDeliveryTotal만 있어도 Plan이 즉시 산출됨
+  if (firstDeliveryTotal > 0) {
     status = 'complete';
     statusMessage = undefined;
   }
