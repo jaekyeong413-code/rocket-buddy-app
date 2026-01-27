@@ -6,6 +6,7 @@ interface StageBProps {
   onTotalRemainingChange: (value: string) => void;
   on203DRemainingChange: (value: string) => void;
   onFreshBagChange: (data: FreshBagData) => void;
+  onStageBReturnRemaining203DChange?: (value: string) => void;
   onStageBReturnRemaining206AChange?: (value: string) => void;
   onStageBUnvisitedFBTotal203DChange?: (value: string) => void;
 }
@@ -15,6 +16,7 @@ export function StageB({
   onTotalRemainingChange,
   on203DRemainingChange,
   onFreshBagChange,
+  onStageBReturnRemaining203DChange,
   onStageBReturnRemaining206AChange,
   onStageBUnvisitedFBTotal203DChange,
 }: StageBProps) {
@@ -141,7 +143,32 @@ export function StageB({
         </p>
       </div>
 
-      {/* Source Input: 206A 잔여 반품 - 반품 수익/통계용 */}
+      {/* Source Input: 203D 잔여 반품 - 반품 라우트 분리용 */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-warning/30">
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-xs font-medium text-warning">
+            203D 잔여 반품
+          </label>
+          <span className="text-xs bg-warning/10 px-2 py-0.5 rounded text-warning">Source</span>
+        </div>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.stageB_returnRemaining_203D ?? ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            onStageBReturnRemaining203DChange?.(val);
+          }}
+          placeholder="0"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          1회전 종료(203D 종료) 시점에 203D에 남아 있는 반품(회수) 잔여
+        </p>
+      </div>
+
+      {/* Source Input: 206A 잔여 반품 - 반품 라우트 분리용 */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-warning/30">
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-medium text-warning">
@@ -162,7 +189,7 @@ export function StageB({
           className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
         />
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          반품 수익/통계용. 배송(기프트) 계산에 영향 없음
+          1회전 종료 시점에 206A에 남아 있는 반품(회수) 잔여
         </p>
       </div>
 

@@ -148,7 +148,10 @@ export interface TodayWorkData {
   // [Stage B] 203D 잔여 물량 (= F_r1_203D_remain)
   // → routes['203D'].firstRoundRemaining에 저장
   
-  // [Stage B] 206A 잔여 반품 - 반품 수익/통계용 (배송 계산 무관)
+  // [Stage B] 203D 잔여 반품 - 반품 라우트 분리용
+  stageB_returnRemaining_203D?: number;
+  
+  // [Stage B] 206A 잔여 반품 - 반품 라우트 분리용
   stageB_returnRemaining_206A?: number;
   
   // [Stage C] 1회전 종료 시점 잔여 물량 (= H_round1EndRemaining) - 있으면 입력

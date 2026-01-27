@@ -117,7 +117,13 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     });
   };
 
-  // 206A 잔여 반품 (반품 수익/통계용)
+  // 203D 잔여 반품 (반품 라우트 분리용)
+  const handleStageBReturnRemaining203DChange = (value: string) => {
+    const val = parseInt(value) || 0;
+    updateWorkData(date, { stageB_returnRemaining_203D: val });
+  };
+
+  // 206A 잔여 반품 (반품 라우트 분리용)
   const handleStageBReturnRemaining206AChange = (value: string) => {
     const val = parseInt(value) || 0;
     updateWorkData(date, { stageB_returnRemaining_206A: val });
@@ -274,6 +280,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             onTotalRemainingChange={handleTotalRemainingChange}
             on203DRemainingChange={handle203DRemainingChange}
             onFreshBagChange={handleFreshBagChange}
+            onStageBReturnRemaining203DChange={handleStageBReturnRemaining203DChange}
             onStageBReturnRemaining206AChange={handleStageBReturnRemaining206AChange}
             onStageBUnvisitedFBTotal203DChange={handleStageBUnvisitedFBTotal203DChange}
           />
