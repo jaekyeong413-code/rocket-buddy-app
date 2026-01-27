@@ -153,56 +153,86 @@ export function TodayIncomeCard() {
               )}
             </div>
 
-            {/* 반품 수입 (라우트별 분리) - returnDerived 직접 사용 */}
+            {/* 반품 수입 (할당 - 잔여 방식) */}
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-muted-foreground">반품 수입</h4>
-              {/* 203D 반품 - 항상 표시 (0인 경우 제외) */}
-              {incomeBreakdown.returnDerived.R1_RETURN_ASSIGNED_203D > 0 && (
-                <div className="flex items-center justify-between p-3 bg-warning/10 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-warning">203D</span>
-                    <span className="text-xs text-muted-foreground">
-                      {incomeBreakdown.returnPlan203D}건
-                      {incomeBreakdown.returnLoss203D > 0 && (
-                        <span className="text-destructive ml-1">(-{incomeBreakdown.returnLoss203D})</span>
-                      )}
-                    </span>
-                  </div>
-                  <span className="font-medium">
-                    {formatCurrency(incomeBreakdown.returnDerived.RETURN_INCOME_203D)}
-                  </span>
-                </div>
-              )}
-              {/* 206A 반품 - 항상 표시 (0인 경우 제외) */}
-              {incomeBreakdown.returnDerived.R1_RETURN_ASSIGNED_206A > 0 && (
-                <div className="flex items-center justify-between p-3 bg-warning/10 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-warning">206A</span>
-                    <span className="text-xs text-muted-foreground">
-                      {incomeBreakdown.returnPlan206A}건
-                      {incomeBreakdown.returnLoss206A > 0 && (
-                        <span className="text-destructive ml-1">(-{incomeBreakdown.returnLoss206A})</span>
-                      )}
-                    </span>
-                  </div>
-                  <span className="font-medium">
-                    {formatCurrency(incomeBreakdown.returnDerived.RETURN_INCOME_206A)}
-                  </span>
-                </div>
-              )}
-              {/* 반품 합계 */}
-              <div className="flex items-center justify-between p-3 bg-warning/20 rounded-xl border border-warning/30">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-warning">반품 합계</span>
-                  <span className="text-xs text-muted-foreground">
-                    {incomeBreakdown.returnDerived.R1_RETURN_DONE_TOTAL}건
-                  </span>
-                </div>
-                <span className="font-semibold text-warning">{formatCurrency(incomeBreakdown.returnDerived.RETURN_INCOME_TOTAL)}</span>
-              </div>
-              {(incomeBreakdown.returnDerived.R1_RETURN_TOTAL === 0) && (
-                <p className="text-sm text-muted-foreground text-center py-2">Stage A/B 반품 입력 필요</p>
-              )}
+              {(() => {
+                const rd = incomeBreakdown.returnDerived;
+                const rem203D = rd.R1_RETURN_REM_203D;
+                const rem206A = rd.R1_RETURN_REM_206A;
+                const assigned203D = rd.R1_RETURN_ASSIGNED_203D;
+                const assigned206A = rd.R1_RETURN_ASSIGNED_206A;
+                const rate203D = 850;
+                const rate206A = 750;
+                
+                // 금액 계산: 할당 - 잔여
+                const gross203D = assigned203D * rate203D;
+                const deduct203D = rem203D * rate203D;
+                const net203D = gross203D - deduct203D;
+                
+                const gross206A = assigned206A * rate206A;
+                const deduct206A = rem206A * rate206A;
+                const net206A = gross206A - deduct206A;
+                
+                const totalAssigned = assigned203D + assigned206A;
+                const totalRem = rem203D + rem206A;
+                const totalNet = net203D + net206A;
+                
+                return (
+                  <>
+                    {/* 203D 반품 - ASSIGNED > 0이면 표시 */}
+                    {assigned203D > 0 && (
+                      <div className="flex items-center justify-between p-3 bg-warning/10 rounded-xl">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-warning">203D</span>
+                          <span className="text-xs text-muted-foreground">
+                            {assigned203D}건
+                            {rem203D > 0 && (
+                              <span className="text-destructive ml-1">(-{rem203D})</span>
+                            )}
+                          </span>
+                        </div>
+                        <span className="font-medium">
+                          {formatCurrency(net203D)}
+                        </span>
+                      </div>
+                    )}
+                    {/* 206A 반품 - ASSIGNED > 0이면 표시 (net이 0이어도) */}
+                    {assigned206A > 0 && (
+                      <div className="flex items-center justify-between p-3 bg-warning/10 rounded-xl">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-warning">206A</span>
+                          <span className="text-xs text-muted-foreground">
+                            {assigned206A}건
+                            {rem206A > 0 && (
+                              <span className="text-destructive ml-1">(-{rem206A})</span>
+                            )}
+                          </span>
+                        </div>
+                        <span className="font-medium">
+                          {formatCurrency(net206A)}
+                        </span>
+                      </div>
+                    )}
+                    {/* 반품 합계 */}
+                    <div className="flex items-center justify-between p-3 bg-warning/20 rounded-xl border border-warning/30">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-warning">반품 합계</span>
+                        <span className="text-xs text-muted-foreground">
+                          {totalAssigned}건
+                          {totalRem > 0 && (
+                            <span className="text-destructive ml-1">(-{totalRem})</span>
+                          )}
+                        </span>
+                      </div>
+                      <span className="font-semibold text-warning">{formatCurrency(totalNet)}</span>
+                    </div>
+                    {(rd.R1_RETURN_TOTAL === 0) && (
+                      <p className="text-sm text-muted-foreground text-center py-2">Stage A/B 반품 입력 필요</p>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* 프레시백 수입 */}
