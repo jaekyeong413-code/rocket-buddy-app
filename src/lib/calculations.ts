@@ -1,4 +1,5 @@
 import { Settings, WorkRecord, PeriodSummary, WeeklyStats, FreshBagData, DeliveryData, ReturnsData, TodayWorkData } from '@/types';
+import { calculateGiftFromWorkData, GiftDerivedValues } from './giftCalculations';
 
 // ================================
 // 고정 단가 (참조용 - settings에서 가져옴)
@@ -55,12 +56,15 @@ export function parseDate(dateString: string): Date {
 // 오늘 예상 수입 계산 (TodayWorkData 기반 - Plan/Loss/Extra)
 // ================================
 export interface TodayIncomeBreakdown {
-  // 기프트(배송) 수입
+  // 기프트(배송) 수입 - 엑셀/넘버스식 Derived 사용
   giftPlan203D: number;
   giftPlan206A: number;
   giftLoss203D: number;  // 미배송
   giftLoss206A: number;  // 미배송
   giftIncome: number;
+  
+  // 기프트 Derived 값 전체 (디버그/데이터계산탭용)
+  giftDerived: GiftDerivedValues;
   
   // 반품 수입
   returnPlan203D: number;
@@ -105,69 +109,15 @@ export function calculateTodayIncome(
   const fbStandaloneRate = settings.freshBag.standalone; // 200원
 
   // ================================
-  // 엑셀/넘버스식 결정론적 계산 (단일 계산 흐름)
+  // 1. 기프트(배송) - 엑셀/넘버스식 계산 엔진 사용
   // ================================
-  // Source Input: 사용자가 직접 입력하는 값만
-  // Derived: 입력값 변경 시 즉시 재계산 (ReadOnly)
-  // 계산 순서: 전체 → 분리 → 차감
-  // ================================
-
-  // ================================
-  // 1. Source Input (원천값) - 배송(기프트)
-  // ================================
-  // firstDeliveryTotal: 1차 배송 전체 물량 (아침 상차 후 입력)
-  const firstDeliveryTotal = workData.firstAllocationDelivery || 0;
+  // 핵심: calculateGiftFromWorkData가 모든 기프트 Derived 값을 계산
+  // 대시보드는 이 Derived 값만 참조 (직접 계산 금지)
+  const giftDerived = calculateGiftFromWorkData(workData);
   
-  // firstRoundEndTotalRemaining: 1회전 종료 시 전체 잔여 (1회전 종료 직후 입력)
-  // Stage B의 G 또는 Stage C의 H 중 마지막 입력값 사용
-  const firstRoundEndTotalRemaining = workData.round1EndRemaining ?? workData.totalRemainingAfterFirstRound ?? 0;
-  
-  // secondRoundEndTotalRemaining: 2회전 종료 후 전체 잔여 (2회전 종료 직후 입력)
-  const secondRoundEndTotalRemaining = workData.round2EndRemaining ?? 0;
-
-  // ================================
-  // 2. Derived (파생값) - 배송(기프트)
-  // ================================
-  // firstRoundDeliveredTotal: 1회전 실제 배송 완료 = 1차전체 - 1회전종료잔여
-  const firstRoundDeliveredTotal = Math.max(0, firstDeliveryTotal - firstRoundEndTotalRemaining);
-  
-  // secondRoundStartTotal: 2회전 시작 물량 = 1회전 종료 잔여
-  const secondRoundStartTotal = firstRoundEndTotalRemaining;
-  
-  // 2회전 추가 물량 (Stage D에서 입력한 값 - 1회전 잔여)
-  const round2TotalRemaining = workData.round2TotalRemaining ?? 0;
-  const secondRoundNewAllocation = Math.max(0, round2TotalRemaining - firstRoundEndTotalRemaining);
-  const secondRoundTotalStart = secondRoundStartTotal + secondRoundNewAllocation;
-  
-  // secondRoundDeliveredTotal: 2회전 실제 배송 완료 = 2회전시작 - 2회전종료잔여
-  const secondRoundDeliveredTotal = Math.max(0, secondRoundTotalStart - secondRoundEndTotalRemaining);
-  
-  // todayDeliveredTotal: 오늘 전체 배송 완료 = 1회전완료 + 2회전완료
-  const todayDeliveredTotal = firstRoundDeliveredTotal + secondRoundDeliveredTotal;
-
-  // ================================
-  // 3. 노선별 배송 분리 (Derived)
-  // ================================
-  // 1차 배송: 사전 할당 기준 (Stage B의 F값 사용)
-  const firstRound203DRemaining = workData.routes?.['203D']?.firstRoundRemaining ?? 0;
-  
-  // 206A 1차 할당 = 전체잔여(G) - 203D잔여(F) — 단, 이 값은 참조용
-  // 하지만 실제 배송 완료 계산은 "전체 - 잔여" 원칙 준수
-  
-  // 1회전 배송 분리: 203D 완료 = 1차할당 - 203D잔여
-  const first203DAllocated = firstDeliveryTotal; // Stage A에서 입력한 값이 203D 할당
-  const first203DDelivered = Math.max(0, first203DAllocated - firstRound203DRemaining);
-  
-  // 206A 1회전 완료: 전체 1회전 완료 - 203D 완료
-  const first206ADelivered = Math.max(0, firstRoundDeliveredTotal - first203DDelivered);
-  
-  // 2회전: 203D에서만 배송 (206A는 1회전에서 완료)
-  const second203DDelivered = secondRoundDeliveredTotal;
-  const second206ADelivered = 0;
-  
-  // 오늘 노선별 완료
-  const giftPlan203D = first203DDelivered + second203DDelivered;
-  const giftPlan206A = first206ADelivered + second206ADelivered;
+  // Derived에서 라우트별 합계 가져오기
+  const giftPlan203D = giftDerived.GIFT_TOTAL_203D;
+  const giftPlan206A = giftDerived.GIFT_TOTAL_206A;
   
   // Loss: 미배송 (Stage F 플로팅 입력)
   const undeliveredEntries = workData.undelivered || [];
@@ -183,21 +133,18 @@ export function calculateTodayIncome(
     (Math.max(0, giftPlan203D - giftLoss203D) * rate203D) +
     (Math.max(0, giftPlan206A - giftLoss206A) * rate206A);
   
-  console.log('[calculateTodayIncome] 엑셀식 배송 계산:', {
-    sourceInputs: { firstDeliveryTotal, firstRoundEndTotalRemaining, secondRoundEndTotalRemaining, round2TotalRemaining },
-    derived: { 
-      firstRoundDeliveredTotal, 
-      secondRoundStartTotal, 
-      secondRoundNewAllocation,
-      secondRoundDeliveredTotal, 
-      todayDeliveredTotal 
+  console.log('[calculateTodayIncome] 엑셀식 기프트 계산 (giftCalculations.ts 사용):', {
+    derived: {
+      GIFT1_203D: giftDerived.GIFT1_203D,
+      GIFT1_206A: giftDerived.GIFT1_206A,
+      GIFT2_203D: giftDerived.GIFT2_203D,
+      GIFT2_206A: giftDerived.GIFT2_206A,
+      GIFT_TOTAL_203D: giftDerived.GIFT_TOTAL_203D,
+      GIFT_TOTAL_206A: giftDerived.GIFT_TOTAL_206A,
+      GIFT_TOTAL_ALL: giftDerived.GIFT_TOTAL_ALL,
     },
-    routeSplit: {
-      first203DDelivered, first206ADelivered,
-      second203DDelivered, second206ADelivered,
-      giftPlan203D, giftPlan206A
-    },
-    result: { giftLoss203D, giftLoss206A, giftIncome },
+    loss: { giftLoss203D, giftLoss206A },
+    giftIncome,
   });
 
   // ================================
@@ -307,8 +254,8 @@ export function calculateTodayIncome(
   let status: 'complete' | 'partial' | 'incomplete' = 'incomplete';
   let statusMessage: string | undefined;
   
-  // 상태 판단(표시용): 엑셀식 입력에서는 firstDeliveryTotal만 있어도 Plan이 즉시 산출됨
-  if (firstDeliveryTotal > 0) {
+  // 상태 판단(표시용): 엑셀식 입력에서는 A_GIFT1_TOTAL(firstAllocationDelivery)만 있어도 Plan이 즉시 산출됨
+  if (giftDerived.A1 > 0) {
     status = 'complete';
     statusMessage = undefined;
   }
@@ -329,6 +276,7 @@ export function calculateTodayIncome(
     giftLoss203D,
     giftLoss206A,
     giftIncome,
+    giftDerived,
     returnPlan203D,
     returnPlan206A,
     returnLoss203D,
