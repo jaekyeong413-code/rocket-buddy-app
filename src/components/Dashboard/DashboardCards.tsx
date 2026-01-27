@@ -153,40 +153,40 @@ export function TodayIncomeCard() {
               )}
             </div>
 
-            {/* 반품 수입 (라우트별 분리) */}
+            {/* 반품 수입 (라우트별 분리) - returnDerived 직접 사용 */}
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-muted-foreground">반품 수입</h4>
-              {/* 203D 반품 */}
-              {incomeBreakdown.returnPlan203D > 0 && (
+              {/* 203D 반품 - 항상 표시 (0인 경우 제외) */}
+              {incomeBreakdown.returnDerived.R1_RETURN_ASSIGNED_203D > 0 && (
                 <div className="flex items-center justify-between p-3 bg-warning/10 rounded-xl">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-warning">203D</span>
                     <span className="text-xs text-muted-foreground">
-                      {Math.max(0, incomeBreakdown.returnPlan203D - incomeBreakdown.returnLoss203D)}건
+                      {incomeBreakdown.returnPlan203D}건
                       {incomeBreakdown.returnLoss203D > 0 && (
                         <span className="text-destructive ml-1">(-{incomeBreakdown.returnLoss203D})</span>
                       )}
                     </span>
                   </div>
                   <span className="font-medium">
-                    {formatCurrency(Math.max(0, incomeBreakdown.returnPlan203D - incomeBreakdown.returnLoss203D) * settings.routes['203D'])}
+                    {formatCurrency(incomeBreakdown.returnDerived.RETURN_INCOME_203D)}
                   </span>
                 </div>
               )}
-              {/* 206A 반품 */}
-              {incomeBreakdown.returnPlan206A > 0 && (
+              {/* 206A 반품 - 항상 표시 (0인 경우 제외) */}
+              {incomeBreakdown.returnDerived.R1_RETURN_ASSIGNED_206A > 0 && (
                 <div className="flex items-center justify-between p-3 bg-warning/10 rounded-xl">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-warning">206A</span>
                     <span className="text-xs text-muted-foreground">
-                      {Math.max(0, incomeBreakdown.returnPlan206A - incomeBreakdown.returnLoss206A)}건
+                      {incomeBreakdown.returnPlan206A}건
                       {incomeBreakdown.returnLoss206A > 0 && (
                         <span className="text-destructive ml-1">(-{incomeBreakdown.returnLoss206A})</span>
                       )}
                     </span>
                   </div>
                   <span className="font-medium">
-                    {formatCurrency(Math.max(0, incomeBreakdown.returnPlan206A - incomeBreakdown.returnLoss206A) * settings.routes['206A'])}
+                    {formatCurrency(incomeBreakdown.returnDerived.RETURN_INCOME_206A)}
                   </span>
                 </div>
               )}
@@ -195,12 +195,12 @@ export function TodayIncomeCard() {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-warning">반품 합계</span>
                   <span className="text-xs text-muted-foreground">
-                    {Math.max(0, incomeBreakdown.returnPlan203D + incomeBreakdown.returnPlan206A - incomeBreakdown.returnLoss203D - incomeBreakdown.returnLoss206A)}건
+                    {incomeBreakdown.returnDerived.R1_RETURN_DONE_TOTAL}건
                   </span>
                 </div>
-                <span className="font-semibold text-warning">{formatCurrency(incomeBreakdown.returnIncome)}</span>
+                <span className="font-semibold text-warning">{formatCurrency(incomeBreakdown.returnDerived.RETURN_INCOME_TOTAL)}</span>
               </div>
-              {(incomeBreakdown.returnPlan203D === 0 && incomeBreakdown.returnPlan206A === 0) && (
+              {(incomeBreakdown.returnDerived.R1_RETURN_TOTAL === 0) && (
                 <p className="text-sm text-muted-foreground text-center py-2">Stage A/B 반품 입력 필요</p>
               )}
             </div>
