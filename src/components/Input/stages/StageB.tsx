@@ -164,7 +164,7 @@ export function StageB({
           className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
         />
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          1회전 종료(203D 종료) 시점에 203D에 남아 있는 반품(회수) 잔여
+          Stage B (203D 1회전 종료) 시점 기준 203D 잔여 반품 수량
         </p>
       </div>
 
@@ -189,7 +189,7 @@ export function StageB({
           className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
         />
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          1회전 종료 시점에 206A에 남아 있는 반품(회수) 잔여
+          Stage B 시점 기준 206A에 남아 있는 반품 수량 (206A는 아직 진행 중)
         </p>
       </div>
 
