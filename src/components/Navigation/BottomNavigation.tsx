@@ -1,4 +1,4 @@
-import { Home, PlusCircle, List, Settings } from 'lucide-react';
+import { Home, PlusCircle, Calculator, List, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BottomNavigationProps {
@@ -9,6 +9,7 @@ interface BottomNavigationProps {
 const tabs = [
   { id: 'dashboard', label: '대시보드', icon: Home },
   { id: 'input', label: '입력', icon: PlusCircle },
+  { id: 'calculation', label: '계산', icon: Calculator },
   { id: 'records', label: '기록', icon: List },
   { id: 'settings', label: '설정', icon: Settings },
 ];
@@ -34,11 +35,11 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
             >
               <Icon
                 className={cn(
-                  'w-6 h-6 mb-1 transition-transform',
+                  'w-5 h-5 mb-1 transition-transform',
                   isActive && 'scale-110'
                 )}
               />
-              <span className={cn('text-xs font-medium', isActive && 'font-semibold')}>
+              <span className={cn('text-[10px] font-medium', isActive && 'font-semibold')}>
                 {tab.label}
               </span>
             </button>

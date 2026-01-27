@@ -9,6 +9,7 @@ import {
   TodayStats,
 } from '@/components/Dashboard/DashboardCards';
 import { WorkInputForm } from '@/components/Input/WorkInputForm';
+import { DataCalculationTab } from '@/components/DataCalculation/DataCalculationTab';
 import { RecordsList } from '@/components/Records/RecordsList';
 import { SettingsPage } from '@/components/Settings/SettingsPage';
 import { AuthGate } from '@/components/Security/AuthGate';
@@ -61,6 +62,10 @@ const Index = () => {
 
           {activeTab === 'input' && (
             <WorkInputForm onComplete={handleInputComplete} />
+          )}
+
+          {activeTab === 'calculation' && (
+            <DataCalculationTab />
           )}
 
           {activeTab === 'records' && (

@@ -1,4 +1,5 @@
 import { TodayWorkData, FreshBagData } from '@/types';
+import { calculateGiftFromWorkData } from '@/lib/giftCalculations';
 
 interface StageBProps {
   workData: TodayWorkData;
@@ -23,20 +24,24 @@ export function StageB({
   // ================================
   // Source Input (원천값)
   // ================================
+  // A1: 1차 전체 물량
+  const A_GIFT1_TOTAL = workData.firstAllocationDelivery || 0;
   // G: 1회전 현재 전체 잔여 물량
-  const G_totalRemaining = workData.totalRemainingAfterFirstRound ?? 0;
+  const B_GIFT_REM_TOT_R1 = workData.totalRemainingAfterFirstRound ?? 0;
   // F: 203D 잔여 물량 (노선별 분리용)
-  const F_r1_203D_remain = delivery203D.firstRoundRemaining ?? 0;
+  const B_GIFT_REM_203D_R1 = delivery203D.firstRoundRemaining ?? 0;
   
   // ================================
-  // Derived (파생값 - ReadOnly)
+  // Derived (파생값 - 엑셀/넘버스식 자동계산)
   // ================================
-  // 1차 전체 물량
-  const firstDeliveryTotal = workData.firstAllocationDelivery || 0;
-  // 1회전 배송 완료 = 1차전체 - 전체잔여
-  const firstRoundDelivered = Math.max(0, firstDeliveryTotal - G_totalRemaining);
-  // 206A 1차 할당 (참조용) = max(0, G - F)
-  const r1_206A_alloc = Math.max(0, G_totalRemaining - F_r1_203D_remain);
+  const giftDerived = calculateGiftFromWorkData(workData);
+  
+  // E: 206A 1차 할당 (ReadOnly) = Btot - B203
+  const E_206A_ALLOC = giftDerived.REM_206A_R1;
+  
+  // 1차 기프트 완료 (ReadOnly)
+  const GIFT1_203D = giftDerived.GIFT1_203D;
+  const GIFT1_206A = giftDerived.GIFT1_206A;
 
   return (
     <div className="space-y-4 animate-slide-up">
@@ -47,11 +52,11 @@ export function StageB({
         </p>
       </div>
 
-      {/* Source Input: 1회전 종료 시 전체 잔여 물량 (G) */}
+      {/* Source Input: 1회전 종료 시 전체 잔여 물량 (B_GIFT_REM_TOT_R1) */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-primary/30">
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-medium text-primary">
-            1회전 종료 시 '전체 잔여 물량'
+            전체 잔여 기프트 개수
           </label>
           <span className="text-xs bg-primary/10 px-2 py-0.5 rounded text-primary">Source</span>
         </div>
@@ -59,7 +64,7 @@ export function StageB({
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={G_totalRemaining !== 0 ? String(G_totalRemaining) : (workData.totalRemainingAfterFirstRound !== undefined ? String(workData.totalRemainingAfterFirstRound) : '')}
+          value={B_GIFT_REM_TOT_R1 !== 0 ? String(B_GIFT_REM_TOT_R1) : (workData.totalRemainingAfterFirstRound !== undefined ? String(workData.totalRemainingAfterFirstRound) : '')}
           onChange={(e) => onTotalRemainingChange(e.target.value.replace(/\D/g, ''))}
           placeholder="전체 잔여 물량 입력"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
@@ -69,37 +74,46 @@ export function StageB({
         </p>
       </div>
 
-      {/* Derived: 1회전 배송 완료 (ReadOnly) */}
+      {/* Derived: 1차 기프트 완료 (ReadOnly) */}
       <div className="bg-success/5 rounded-2xl p-4 border border-success/30">
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-medium text-success">
-            1회전 배송 완료 (자동계산)
+            1차 기프트 완료 (자동계산)
           </label>
           <span className="text-xs bg-success/10 px-2 py-0.5 rounded text-success">Derived</span>
         </div>
-        <div className="w-full h-14 px-4 flex items-center justify-center bg-success/10 rounded-xl border-2 border-success/20">
-          <span className="text-2xl font-bold text-success">
-            {firstRoundDelivered}
-          </span>
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="p-2 bg-background rounded-lg">
+            <span className="text-xs text-muted-foreground block">1차전체(A1)</span>
+            <span className="text-lg font-bold">{A_GIFT1_TOTAL}</span>
+          </div>
+          <div className="p-2 bg-success/10 rounded-lg">
+            <span className="text-xs text-muted-foreground block">203D</span>
+            <span className="text-lg font-bold text-success">{GIFT1_203D}</span>
+          </div>
+          <div className="p-2 bg-success/10 rounded-lg">
+            <span className="text-xs text-muted-foreground block">206A</span>
+            <span className="text-lg font-bold text-success">{GIFT1_206A}</span>
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          = 1차전체({firstDeliveryTotal}) - 전체잔여({G_totalRemaining})
+        <p className="text-xs text-muted-foreground mt-2 text-center font-mono">
+          GIFT1 = A1({A_GIFT1_TOTAL}) - Btot({B_GIFT_REM_TOT_R1}) + B203({B_GIFT_REM_203D_R1})
         </p>
       </div>
 
-      {/* Source Input: 203D 잔여 물량 (F) - 노선 분리용 */}
+      {/* Source Input: 203D 잔여 물량 (B_GIFT_REM_203D_R1) - 노선 분리용 */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-border/30">
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-medium text-muted-foreground">
-            203D 잔여 물량 (노선 분리용)
+            203D 잔여 기프트 개수
           </label>
-          <span className="text-xs bg-muted px-2 py-0.5 rounded">선택</span>
+          <span className="text-xs bg-muted px-2 py-0.5 rounded">Source (선택)</span>
         </div>
         <input
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={F_r1_203D_remain !== 0 ? String(F_r1_203D_remain) : (delivery203D.firstRoundRemaining !== undefined ? String(delivery203D.firstRoundRemaining) : '')}
+          value={B_GIFT_REM_203D_R1 !== 0 ? String(B_GIFT_REM_203D_R1) : (delivery203D.firstRoundRemaining !== undefined ? String(delivery203D.firstRoundRemaining) : '')}
           onChange={(e) => on203DRemainingChange(e.target.value.replace(/\D/g, ''))}
           placeholder="203D 잔여 입력 (기본값: 0)"
           className="w-full h-14 px-4 text-xl font-bold text-center bg-muted rounded-xl border-2 border-transparent focus:border-primary focus:outline-none transition-colors"
@@ -109,29 +123,32 @@ export function StageB({
         </p>
       </div>
 
-      {/* Derived: 206A 1차 할당 (참조) - ReadOnly 자동계산 */}
+      {/* Derived: 206A 1차 할당 (ReadOnly 자동계산) - 입력칸 제거됨 */}
       <div className="bg-muted/50 rounded-2xl p-4 border border-border/30">
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-medium text-muted-foreground">
-            206A 1차 할당 (참조)
+            206A 1차 할당 (자동계산)
           </label>
           <span className="text-xs bg-muted px-2 py-0.5 rounded">Derived</span>
         </div>
         <div className="w-full h-12 px-4 flex items-center justify-center bg-muted rounded-xl border-2 border-border/20">
           <span className="text-xl font-bold text-foreground">
-            {r1_206A_alloc}
+            {E_206A_ALLOC}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          = 전체잔여({G_totalRemaining}) - 203D잔여({F_r1_203D_remain})
+        <p className="text-xs text-muted-foreground mt-2 text-center font-mono">
+          = Btot({B_GIFT_REM_TOT_R1}) - B203({B_GIFT_REM_203D_R1})
         </p>
       </div>
 
       {/* Source Input: 206A 잔여 반품 - 반품 수익/통계용 */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-warning/30">
-        <label className="text-xs font-medium text-warning mb-2 block">
-          206A 잔여 반품
-        </label>
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-xs font-medium text-warning">
+            206A 잔여 반품
+          </label>
+          <span className="text-xs bg-warning/10 px-2 py-0.5 rounded text-warning">Source</span>
+        </div>
         <input
           type="text"
           inputMode="numeric"
@@ -145,7 +162,7 @@ export function StageB({
           className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
         />
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          반품 수익/통계용. 배송 계산에 영향 없음
+          반품 수익/통계용. 배송(기프트) 계산에 영향 없음
         </p>
       </div>
 
