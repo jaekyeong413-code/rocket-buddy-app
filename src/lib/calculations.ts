@@ -1,5 +1,6 @@
 import { Settings, WorkRecord, PeriodSummary, WeeklyStats, FreshBagData, DeliveryData, ReturnsData, TodayWorkData } from '@/types';
 import { calculateGiftFromWorkData, GiftDerivedValues } from './giftCalculations';
+import { calculateReturnFromWorkData, ReturnDerivedValues } from './returnCalculations';
 
 // ================================
 // 고정 단가 (참조용 - settings에서 가져옴)
@@ -65,6 +66,9 @@ export interface TodayIncomeBreakdown {
   
   // 기프트 Derived 값 전체 (디버그/데이터계산탭용)
   giftDerived: GiftDerivedValues;
+  
+  // 반품 Derived 값 전체 (디버그/데이터계산탭용)
+  returnDerived: ReturnDerivedValues;
   
   // 반품 수입
   returnPlan203D: number;
@@ -148,27 +152,17 @@ export function calculateTodayIncome(
   });
 
   // ================================
-  // 2. 반품 수입 계산 (라우트 분리)
+  // 2. 반품 수입 계산 (엑셀/넘버스식 계산 엔진 사용)
   // ================================
-  // Source: stageB_returnRemaining_206A, round2EndReturnsRemaining
-  const returnRemaining206A = workData.stageB_returnRemaining_206A ?? 0;
-  const returnTotalFinal = workData.round2EndReturnsRemaining ?? 0;
-  const returnAllocated = workData.returns?.allocated || 0;
+  // 핵심: calculateReturnFromWorkData가 모든 반품 Derived 값을 계산
+  const returnDerived = calculateReturnFromWorkData(workData);
   
-  // Derived: 203D 잔여 = 전체남은 - 206A잔여
-  const returnRemaining203D = Math.max(0, returnTotalFinal - returnRemaining206A);
+  // Derived에서 라우트별 완료 가져오기
+  // R1_RETURN_ASSIGNED_203D - R1_RETURN_REM_203D = 203D 완료
+  const returnPlan203D = Math.max(0, returnDerived.R1_RETURN_ASSIGNED_203D - returnDerived.R1_RETURN_REM_203D);
+  const returnPlan206A = Math.max(0, returnDerived.R1_RETURN_ASSIGNED_206A - returnDerived.R1_RETURN_REM_206A);
   
-  // 반품 완료 = 할당 - 잔여
-  const returnCompleted = Math.max(0, returnAllocated - returnTotalFinal);
-  
-  // 라우트별 완료 (비율 분배)
-  const return206ACompleted = Math.min(returnRemaining206A, returnAllocated - returnRemaining203D);
-  const return203DCompleted = Math.max(0, returnCompleted - return206ACompleted);
-  
-  const returnPlan203D = return203DCompleted;
-  const returnPlan206A = return206ACompleted;
-  
-  // Loss: 반품 미회수
+  // Loss: 반품 미회수 (플로팅 입력)
   const returnNotCollectedEntries = workData.returnNotCollected || [];
   const returnLoss203D = returnNotCollectedEntries
     .filter(e => e.route === '203D')
@@ -177,14 +171,26 @@ export function calculateTodayIncome(
     .filter(e => e.route === '206A')
     .reduce((sum, e) => sum + e.quantity, 0);
   
-  // 반품 수입 = (완료 - 미회수) * 단가
+  // 반품 수입 = (완료 - 미회수) * 단가 (라우트별 단가 적용!)
   const returnIncome = 
     (Math.max(0, returnPlan203D - returnLoss203D) * rate203D) +
     (Math.max(0, returnPlan206A - returnLoss206A) * rate206A);
 
-  console.log('[calculateTodayIncome] 반품 계산:', {
-    returnAllocated, returnTotalFinal, returnRemaining206A, returnRemaining203D,
-    returnPlan203D, returnPlan206A, returnLoss203D, returnLoss206A, returnIncome,
+  console.log('[calculateTodayIncome] 엑셀식 반품 계산 (returnCalculations.ts 사용):', {
+    sources: {
+      R1_RETURN_TOTAL: returnDerived.R1_RETURN_TOTAL,
+      R1_RETURN_REM_203D: returnDerived.R1_RETURN_REM_203D,
+      R1_RETURN_REM_206A: returnDerived.R1_RETURN_REM_206A,
+    },
+    derived: {
+      R1_RETURN_DONE_TOTAL: returnDerived.R1_RETURN_DONE_TOTAL,
+      R1_RETURN_ASSIGNED_203D: returnDerived.R1_RETURN_ASSIGNED_203D,
+      R1_RETURN_ASSIGNED_206A: returnDerived.R1_RETURN_ASSIGNED_206A,
+    },
+    plan: { returnPlan203D, returnPlan206A },
+    loss: { returnLoss203D, returnLoss206A },
+    returnIncome,
+    hasOverflow: returnDerived.hasOverflow,
   });
 
   // ================================
@@ -263,7 +269,7 @@ export function calculateTodayIncome(
   // 디버그 로그
   console.log('[calculateTodayIncome] Plan/Loss/Extra 계산:', {
     gift: { plan203D: giftPlan203D, plan206A: giftPlan206A, loss203D: giftLoss203D, loss206A: giftLoss206A, income: giftIncome },
-    return: { allocated: returnAllocated, loss203D: returnLoss203D, loss206A: returnLoss206A, income: returnIncome },
+    return: { total: returnDerived.R1_RETURN_TOTAL, plan203D: returnPlan203D, plan206A: returnPlan206A, loss203D: returnLoss203D, loss206A: returnLoss206A, income: returnIncome },
     fb: { planGeneral: fbPlanGeneral, planSolo: fbPlanSolo, lossGeneral: fbLossGeneral, lossSolo: fbLossSolo, income: fbIncome },
     chaebeon: { c203D: chaebeon203D, c206A: chaebeon206A, income: chaebeonIncome },
     incentive: { regularRate: regularFBRate, standaloneRate: standaloneFBRate, regular: regularIncentive, standalone: standaloneIncentive },
@@ -277,6 +283,7 @@ export function calculateTodayIncome(
     giftLoss206A,
     giftIncome,
     giftDerived,
+    returnDerived,
     returnPlan203D,
     returnPlan206A,
     returnLoss203D,
