@@ -168,11 +168,11 @@ export function StageB({
         </p>
       </div>
 
-      {/* Source Input: 206A 잔여 반품 - 반품 라우트 분리용 */}
+      {/* Source Input: 206A 1회전 반품 물량 */}
       <div className="bg-card rounded-2xl p-5 shadow-card border border-warning/30">
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-medium text-warning">
-            206A 잔여 반품
+            206A 1회전 반품 물량
           </label>
           <span className="text-xs bg-warning/10 px-2 py-0.5 rounded text-warning">Source</span>
         </div>
@@ -180,7 +180,7 @@ export function StageB({
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={workData.stageB_returnRemaining_206A ?? ''}
+          value={workData.stageB_206A_R1_assigned ?? ''}
           onChange={(e) => {
             const val = e.target.value.replace(/\D/g, '');
             onStageBReturnRemaining206AChange?.(val);
@@ -189,7 +189,7 @@ export function StageB({
           className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
         />
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          Stage B 시점 기준 206A에 남아 있는 반품 수량 (206A는 아직 진행 중)
+          Stage B 시점 기준 206A에 할당된 1회전 반품 수량 (206A는 아직 진행 전)
         </p>
       </div>
 

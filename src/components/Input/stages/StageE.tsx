@@ -6,6 +6,7 @@ interface StageEProps {
   onRound2ReturnsRemainingChange: (value: string) => void;
   onFreshBagChange: (data: FreshBagData) => void;
   onStageEUnvisitedFBSolo203DChange?: (value: string) => void;
+  onStageE206AReturnRemainingChange?: (value: string) => void;
 }
 
 export function StageE({
@@ -14,6 +15,7 @@ export function StageE({
   onRound2ReturnsRemainingChange,
   onFreshBagChange,
   onStageEUnvisitedFBSolo203DChange,
+  onStageE206AReturnRemainingChange,
 }: StageEProps) {
   const freshBag = workData.freshBag;
 
@@ -53,10 +55,10 @@ export function StageE({
   // 오늘 전체 배송 완료
   const todayDeliveredTotal = firstRoundDeliveredTotal + secondRoundDeliveredTotal;
   
-  // 반품 라우트 분리 (파생)
-  const stageB_returnRemaining_206A = workData.stageB_returnRemaining_206A ?? 0;
-  const returnRemain203D = Math.max(0, returnTotalFinal - stageB_returnRemaining_206A);
-  const returnRemain206A = stageB_returnRemaining_206A;
+  // 반품 라우트 분리 (파생) - 새 수식 기반
+  const stageE_206A_rem = workData.stageE_206A_returnRemaining ?? 0;
+  const returnRemain206A = stageE_206A_rem;
+  const returnRemain203D = Math.max(0, returnTotalFinal - returnRemain206A);
 
   return (
     <div className="space-y-4 animate-slide-up">
@@ -156,6 +158,31 @@ export function StageE({
         />
       </div>
 
+      {/* Source Input: 206A 현재 잔여 반품 (E_206_REM_NOW) */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-warning/30">
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-xs font-medium text-warning">
+            206A 현재 잔여 반품
+          </label>
+          <span className="text-xs bg-warning/10 px-2 py-0.5 rounded text-warning">Source</span>
+        </div>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.stageE_206A_returnRemaining ?? ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            onStageE206AReturnRemainingChange?.(val);
+          }}
+          placeholder="0"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          Stage E (203D 완전 종료) 시점 기준 206A에 남아 있는 반품 수량
+        </p>
+      </div>
+
       {/* Derived: 반품 라우트 분리 (ReadOnly) */}
       <div className="bg-warning/5 rounded-2xl p-4 border border-warning/30">
         <div className="flex items-center justify-between mb-3">
@@ -173,7 +200,7 @@ export function StageE({
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          203D잔여 = 전체남은반품 - 206A잔여반품(Stage B)
+          203D잔여 = 전체남은반품 - 206A현재잔여
         </p>
       </div>
 

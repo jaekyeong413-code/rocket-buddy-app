@@ -155,14 +155,14 @@ export function calculateTodayIncome(
   // 2. 반품 수입 계산 (엑셀/넘버스식 계산 엔진 사용)
   // ================================
   // 핵심: calculateReturnFromWorkData가 모든 반품 Derived 값을 계산
+  // 핵심 원칙: 할당 = 수입 기준 (완료 기반 계산 금지!)
   const returnDerived = calculateReturnFromWorkData(workData);
   
-  // Derived에서 라우트별 완료 가져오기
-  // R1_RETURN_ASSIGNED_203D - R1_RETURN_REM_203D = 203D 완료
-  const returnPlan203D = Math.max(0, returnDerived.R1_RETURN_ASSIGNED_203D - returnDerived.R1_RETURN_REM_203D);
-  const returnPlan206A = Math.max(0, returnDerived.R1_RETURN_ASSIGNED_206A - returnDerived.R1_RETURN_REM_206A);
+  // Derived에서 라우트별 할당 가져오기 (DAY_xxx_ASSIGNED = 수입 기준)
+  const returnPlan203D = returnDerived.DAY_203_ASSIGNED;
+  const returnPlan206A = returnDerived.DAY_206_ASSIGNED;
   
-  // Loss: 반품 미회수 (플로팅 입력)
+  // Loss: 반품 미회수 (플로팅 입력) - 사후 차감용
   const returnNotCollectedEntries = workData.returnNotCollected || [];
   const returnLoss203D = returnNotCollectedEntries
     .filter(e => e.route === '203D')
@@ -171,26 +171,27 @@ export function calculateTodayIncome(
     .filter(e => e.route === '206A')
     .reduce((sum, e) => sum + e.quantity, 0);
   
-  // 반품 수입 = (완료 - 미회수) * 단가 (라우트별 단가 적용!)
+  // 반품 수입 = (할당 - 미회수) * 단가 (할당 = 수입 기준, 라우트별 단가 적용!)
   const returnIncome = 
     (Math.max(0, returnPlan203D - returnLoss203D) * rate203D) +
     (Math.max(0, returnPlan206A - returnLoss206A) * rate206A);
 
   console.log('[calculateTodayIncome] 엑셀식 반품 계산 (returnCalculations.ts 사용):', {
     sources: {
-      R1_RETURN_TOTAL: returnDerived.R1_RETURN_TOTAL,
-      R1_RETURN_REM_203D: returnDerived.R1_RETURN_REM_203D,
-      R1_RETURN_REM_206A: returnDerived.R1_RETURN_REM_206A,
+      A_R1_RET_TOTAL: returnDerived.A_R1_RET_TOTAL,
+      B_203_REM_R1: returnDerived.B_203_REM_R1,
+      B_206_R1_ASSIGNED: returnDerived.B_206_R1_ASSIGNED,
+      C_206_REM_R1: returnDerived.C_206_REM_R1,
+      D_RET_TOTAL_NOW: returnDerived.D_RET_TOTAL_NOW,
+      E_206_REM_NOW: returnDerived.E_206_REM_NOW,
     },
     derived: {
-      R1_RETURN_DONE_TOTAL: returnDerived.R1_RETURN_DONE_TOTAL,
-      R1_RETURN_ASSIGNED_203D: returnDerived.R1_RETURN_ASSIGNED_203D,
-      R1_RETURN_ASSIGNED_206A: returnDerived.R1_RETURN_ASSIGNED_206A,
+      DAY_203_ASSIGNED: returnDerived.DAY_203_ASSIGNED,
+      DAY_206_ASSIGNED: returnDerived.DAY_206_ASSIGNED,
     },
     plan: { returnPlan203D, returnPlan206A },
     loss: { returnLoss203D, returnLoss206A },
     returnIncome,
-    hasOverflow: returnDerived.hasOverflow,
   });
 
   // ================================

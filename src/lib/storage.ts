@@ -71,10 +71,12 @@ export function createDefaultDraft(date: string): DraftData {
     },
     returns: createDefaultReturnsData(),
     freshBag: createDefaultFreshBagData(),
-    // ★ 신규 5개 필드 기본값
-    stageB_returnRemaining_206A: 0,
+    // ★ 신규 반품 Source 필드 기본값
+    stageB_206A_R1_assigned: 0,       // Stage B: 206A 1회전 반품 할당
+    stageC_206A_returnRemaining: 0,   // Stage C: 206A 잔여 반품
+    stageE_206A_returnRemaining: 0,   // Stage E: 206A 현재 잔여 반품
+    // 프레시백 관련
     stageB_unvisitedFB_total_203D: 0,
-    stageC_returnRemaining_206A: 0,
     stageE_unvisitedFB_solo_203D: 0,
     stageF_unvisitedFB_solo_206A: 0,
 
