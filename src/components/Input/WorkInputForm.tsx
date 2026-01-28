@@ -123,10 +123,10 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
     updateWorkData(date, { stageB_returnRemaining_203D: val });
   };
 
-  // 206A 잔여 반품 (반품 라우트 분리용)
+  // 206A 1회전 반품 할당 (반품 라우트 분리용)
   const handleStageBReturnRemaining206AChange = (value: string) => {
     const val = parseInt(value) || 0;
-    updateWorkData(date, { stageB_returnRemaining_206A: val });
+    updateWorkData(date, { stageB_206A_R1_assigned: val });
   };
 
   const handleStageBUnvisitedFBTotal203DChange = (value: string) => {
@@ -141,6 +141,12 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const handleRound1EndRemainingChange = (value: string) => {
     const remaining = parseInt(value) || 0;
     updateWorkData(date, { round1EndRemaining: remaining });
+  };
+
+  // Stage C: 206A 잔여 반품
+  const handleStageC206AReturnRemainingChange = (value: string) => {
+    const val = parseInt(value) || 0;
+    updateWorkData(date, { stageC_206A_returnRemaining: val });
   };
 
   const handleFreshBagRound1EndChange = useCallback((data: FreshBagData) => {
@@ -183,6 +189,12 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
   const handleStageEUnvisitedFBSolo203DChange = (value: string) => {
     const val = parseInt(value) || 0;
     updateWorkData(date, { stageE_unvisitedFB_solo_203D: val });
+  };
+
+  // Stage E: 206A 현재 잔여 반품
+  const handleStageE206AReturnRemainingChange = (value: string) => {
+    const val = parseInt(value) || 0;
+    updateWorkData(date, { stageE_206A_returnRemaining: val });
   };
 
   // ================================
@@ -291,6 +303,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             workData={workData}
             onFreshBagChange={handleFreshBagRound1EndChange}
             onRound1EndRemainingChange={handleRound1EndRemainingChange}
+            onStageC206AReturnRemainingChange={handleStageC206AReturnRemainingChange}
           />
         );
       case 'D':
@@ -310,6 +323,7 @@ export function WorkInputForm({ onComplete }: { onComplete?: () => void }) {
             onRound2ReturnsRemainingChange={handleRound2ReturnsRemainingChange}
             onFreshBagChange={handleFreshBagChange}
             onStageEUnvisitedFBSolo203DChange={handleStageEUnvisitedFBSolo203DChange}
+            onStageE206AReturnRemainingChange={handleStageE206AReturnRemainingChange}
           />
         );
       case 'F':

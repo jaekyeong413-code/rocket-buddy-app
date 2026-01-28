@@ -158,25 +158,18 @@ export function TodayIncomeCard() {
               <h4 className="text-sm font-medium text-muted-foreground">반품 수입</h4>
               {(() => {
                 const rd = incomeBreakdown.returnDerived;
-                const rem203D = rd.R1_RETURN_REM_203D;
-                const rem206A = rd.R1_RETURN_REM_206A;
-                const assigned203D = rd.R1_RETURN_ASSIGNED_203D;
-                const assigned206A = rd.R1_RETURN_ASSIGNED_206A;
+                // 새 엔진: DAY_xxx_ASSIGNED = 하루 총 할당 (수입 기준)
+                const assigned203D = rd.DAY_203_ASSIGNED;
+                const assigned206A = rd.DAY_206_ASSIGNED;
                 const rate203D = 850;
                 const rate206A = 750;
                 
-                // 금액 계산: 할당 - 잔여
-                const gross203D = assigned203D * rate203D;
-                const deduct203D = rem203D * rate203D;
-                const net203D = gross203D - deduct203D;
-                
-                const gross206A = assigned206A * rate206A;
-                const deduct206A = rem206A * rate206A;
-                const net206A = gross206A - deduct206A;
+                // 금액 계산: 할당 = 수입 (잔여 차감 없음, 미회수만 별도 차감)
+                const income203D = assigned203D * rate203D;
+                const income206A = assigned206A * rate206A;
                 
                 const totalAssigned = assigned203D + assigned206A;
-                const totalRem = rem203D + rem206A;
-                const totalNet = net203D + net206A;
+                const totalIncome = income203D + income206A;
                 
                 return (
                   <>
@@ -187,30 +180,24 @@ export function TodayIncomeCard() {
                           <span className="font-semibold text-warning">203D</span>
                           <span className="text-xs text-muted-foreground">
                             {assigned203D}건
-                            {rem203D > 0 && (
-                              <span className="text-destructive ml-1">(-{rem203D})</span>
-                            )}
                           </span>
                         </div>
                         <span className="font-medium">
-                          {formatCurrency(net203D)}
+                          {formatCurrency(income203D)}
                         </span>
                       </div>
                     )}
-                    {/* 206A 반품 - ASSIGNED > 0이면 표시 (net이 0이어도) */}
+                    {/* 206A 반품 - ASSIGNED > 0이면 표시 */}
                     {assigned206A > 0 && (
                       <div className="flex items-center justify-between p-3 bg-warning/10 rounded-xl">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-warning">206A</span>
                           <span className="text-xs text-muted-foreground">
                             {assigned206A}건
-                            {rem206A > 0 && (
-                              <span className="text-destructive ml-1">(-{rem206A})</span>
-                            )}
                           </span>
                         </div>
                         <span className="font-medium">
-                          {formatCurrency(net206A)}
+                          {formatCurrency(income206A)}
                         </span>
                       </div>
                     )}
@@ -220,15 +207,12 @@ export function TodayIncomeCard() {
                         <span className="text-sm font-medium text-warning">반품 합계</span>
                         <span className="text-xs text-muted-foreground">
                           {totalAssigned}건
-                          {totalRem > 0 && (
-                            <span className="text-destructive ml-1">(-{totalRem})</span>
-                          )}
                         </span>
                       </div>
-                      <span className="font-semibold text-warning">{formatCurrency(totalNet)}</span>
+                      <span className="font-semibold text-warning">{formatCurrency(totalIncome)}</span>
                     </div>
-                    {(rd.R1_RETURN_TOTAL === 0) && (
-                      <p className="text-sm text-muted-foreground text-center py-2">Stage A/B 반품 입력 필요</p>
+                    {(rd.A_R1_RET_TOTAL === 0) && (
+                      <p className="text-sm text-muted-foreground text-center py-2">Stage A 반품 입력 필요</p>
                     )}
                   </>
                 );

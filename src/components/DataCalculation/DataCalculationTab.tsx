@@ -278,21 +278,39 @@ export function DataCalculationTab() {
             <TableBody>
               <TableRow>
                 <TableCell className="font-medium text-warning">A</TableCell>
-                <TableCell className="font-mono text-xs">R1_RETURN_TOTAL</TableCell>
+                <TableCell className="font-mono text-xs">A_R1_RET_TOTAL</TableCell>
                 <TableCell className="text-xs text-muted-foreground">1회전 반품 전체 할당</TableCell>
-                <TableCell className="text-right font-bold">{returnSources.R1_RETURN_TOTAL}</TableCell>
+                <TableCell className="text-right font-bold">{returnSources.A_R1_RET_TOTAL}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium text-warning">B</TableCell>
-                <TableCell className="font-mono text-xs">R1_RETURN_REM_203D</TableCell>
-                <TableCell className="text-xs text-muted-foreground">203D 잔여 반품</TableCell>
-                <TableCell className="text-right font-bold">{returnSources.R1_RETURN_REM_203D}</TableCell>
+                <TableCell className="font-mono text-xs">B_203_REM_R1</TableCell>
+                <TableCell className="text-xs text-muted-foreground">203D 잔여(미방문) 반품</TableCell>
+                <TableCell className="text-right font-bold">{returnSources.B_203_REM_R1}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium text-warning">B</TableCell>
-                <TableCell className="font-mono text-xs">R1_RETURN_REM_206A</TableCell>
-                <TableCell className="text-xs text-muted-foreground">206A 잔여 반품</TableCell>
-                <TableCell className="text-right font-bold">{returnSources.R1_RETURN_REM_206A}</TableCell>
+                <TableCell className="font-mono text-xs">B_206_R1_ASSIGNED</TableCell>
+                <TableCell className="text-xs text-muted-foreground">206A 1회전 반품 할당</TableCell>
+                <TableCell className="text-right font-bold">{returnSources.B_206_R1_ASSIGNED}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-warning">C</TableCell>
+                <TableCell className="font-mono text-xs">C_206_REM_R1</TableCell>
+                <TableCell className="text-xs text-muted-foreground">206A 잔여(미방문) 반품</TableCell>
+                <TableCell className="text-right font-bold">{returnSources.C_206_REM_R1}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-warning">D</TableCell>
+                <TableCell className="font-mono text-xs">D_RET_TOTAL_NOW</TableCell>
+                <TableCell className="text-xs text-muted-foreground">1회전잔여 + 2회전신규 반품</TableCell>
+                <TableCell className="text-right font-bold">{returnSources.D_RET_TOTAL_NOW}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-warning">E</TableCell>
+                <TableCell className="font-mono text-xs">E_206_REM_NOW</TableCell>
+                <TableCell className="text-xs text-muted-foreground">현시점 206A 잔여 반품</TableCell>
+                <TableCell className="text-right font-bold">{returnSources.E_206_REM_NOW}</TableCell>
               </TableRow>
             </TableBody>
           </UITable>
@@ -305,12 +323,6 @@ export function DataCalculationTab() {
           <RotateCcw className="w-5 h-5 text-warning" />
           <h3 className="text-base font-semibold text-warning">반품 라우트 분리 (Derived)</h3>
           <span className="text-xs bg-warning/10 px-2 py-0.5 rounded text-warning">ReadOnly</span>
-          {returnDerived.hasOverflow && (
-            <span className="flex items-center gap-1 text-xs bg-destructive/10 px-2 py-0.5 rounded text-destructive">
-              <AlertTriangle className="w-3 h-3" />
-              잔여 합계 초과
-            </span>
-          )}
         </div>
         
         <div className="overflow-x-auto">
@@ -323,20 +335,60 @@ export function DataCalculationTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* 1회전 할당 */}
               <TableRow>
-                <TableCell className="font-mono text-xs">R1_RETURN_DONE_TOTAL</TableCell>
-                <TableCell className="text-xs text-muted-foreground">TOTAL - (REM_203D + REM_206A)</TableCell>
-                <TableCell className="text-right font-bold">{returnDerived.R1_RETURN_DONE_TOTAL}</TableCell>
+                <TableCell className="font-mono text-xs">R1_203_ASSIGNED</TableCell>
+                <TableCell className="text-xs text-muted-foreground">A_R1_RET_TOTAL - B_206_R1_ASSIGNED</TableCell>
+                <TableCell className="text-right font-bold">{returnDerived.R1_203_ASSIGNED}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-mono text-xs">R1_206_ASSIGNED</TableCell>
+                <TableCell className="text-xs text-muted-foreground">B_206_R1_ASSIGNED</TableCell>
+                <TableCell className="text-right font-bold">{returnDerived.R1_206_ASSIGNED}</TableCell>
+              </TableRow>
+              {/* 1회전 완료 */}
+              <TableRow>
+                <TableCell className="font-mono text-xs">R1_203_DONE</TableCell>
+                <TableCell className="text-xs text-muted-foreground">R1_203_ASSIGNED - B_203_REM_R1</TableCell>
+                <TableCell className="text-right font-bold">{returnDerived.R1_203_DONE}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-mono text-xs">R1_206_DONE</TableCell>
+                <TableCell className="text-xs text-muted-foreground">R1_206_ASSIGNED - C_206_REM_R1</TableCell>
+                <TableCell className="text-right font-bold">{returnDerived.R1_206_DONE}</TableCell>
+              </TableRow>
+              {/* 1회전 잔여 합계 */}
+              <TableRow>
+                <TableCell className="font-mono text-xs">R1_REM_TOTAL</TableCell>
+                <TableCell className="text-xs text-muted-foreground">B_203_REM_R1 + C_206_REM_R1</TableCell>
+                <TableCell className="text-right font-bold">{returnDerived.R1_REM_TOTAL}</TableCell>
+              </TableRow>
+              {/* 2회전 신규 */}
+              <TableRow>
+                <TableCell className="font-mono text-xs">R2_NEW_TOTAL</TableCell>
+                <TableCell className="text-xs text-muted-foreground">D_RET_TOTAL_NOW - R1_REM_TOTAL</TableCell>
+                <TableCell className="text-right font-bold">{returnDerived.R2_NEW_TOTAL}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-mono text-xs">R2_206_NEW</TableCell>
+                <TableCell className="text-xs text-muted-foreground">E_206_REM_NOW - C_206_REM_R1</TableCell>
+                <TableCell className="text-right font-bold">{returnDerived.R2_206_NEW}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-mono text-xs">R2_203_NEW</TableCell>
+                <TableCell className="text-xs text-muted-foreground">R2_NEW_TOTAL - R2_206_NEW</TableCell>
+                <TableCell className="text-right font-bold">{returnDerived.R2_203_NEW}</TableCell>
+              </TableRow>
+              {/* 하루 총 할당 (수입 기준) */}
+              <TableRow className="bg-warning/5">
+                <TableCell className="font-mono text-xs font-semibold">DAY_203_ASSIGNED</TableCell>
+                <TableCell className="text-xs text-muted-foreground">R1_203_ASSIGNED + R2_203_NEW</TableCell>
+                <TableCell className="text-right font-bold text-warning text-lg">{returnDerived.DAY_203_ASSIGNED}</TableCell>
               </TableRow>
               <TableRow className="bg-warning/5">
-                <TableCell className="font-mono text-xs font-semibold">R1_RETURN_ASSIGNED_203D</TableCell>
-                <TableCell className="text-xs text-muted-foreground">DONE_TOTAL + REM_203D</TableCell>
-                <TableCell className="text-right font-bold text-warning text-lg">{returnDerived.R1_RETURN_ASSIGNED_203D}</TableCell>
-              </TableRow>
-              <TableRow className="bg-warning/5">
-                <TableCell className="font-mono text-xs font-semibold">R1_RETURN_ASSIGNED_206A</TableCell>
-                <TableCell className="text-xs text-muted-foreground">TOTAL - ASSIGNED_203D</TableCell>
-                <TableCell className="text-right font-bold text-warning text-lg">{returnDerived.R1_RETURN_ASSIGNED_206A}</TableCell>
+                <TableCell className="font-mono text-xs font-semibold">DAY_206_ASSIGNED</TableCell>
+                <TableCell className="text-xs text-muted-foreground">R1_206_ASSIGNED + R2_206_NEW</TableCell>
+                <TableCell className="text-right font-bold text-warning text-lg">{returnDerived.DAY_206_ASSIGNED}</TableCell>
               </TableRow>
             </TableBody>
           </UITable>
@@ -344,18 +396,18 @@ export function DataCalculationTab() {
 
         {/* 반품 수입 */}
         <div className="mt-4 pt-4 border-t border-warning/20">
-          <h4 className="text-sm font-medium mb-3">반품 수입 (라우트별 단가 적용)</h4>
+          <h4 className="text-sm font-medium mb-3">반품 수입 (할당 = 수입 기준, 라우트별 단가 적용)</h4>
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-muted/50 p-3 rounded-xl text-center">
               <span className="text-xs text-muted-foreground block mb-1">203D 반품</span>
-              <span className="text-lg font-bold text-primary">{Math.max(0, returnDerived.R1_RETURN_ASSIGNED_203D - returnDerived.R1_RETURN_REM_203D)}건</span>
+              <span className="text-lg font-bold text-primary">{returnDerived.DAY_203_ASSIGNED}건</span>
               <span className="text-xs text-muted-foreground block mt-1">
                 × {rate203D}원 = {returnDerived.RETURN_INCOME_203D.toLocaleString()}원
               </span>
             </div>
             <div className="bg-muted/50 p-3 rounded-xl text-center">
               <span className="text-xs text-muted-foreground block mb-1">206A 반품</span>
-              <span className="text-lg font-bold text-success">{Math.max(0, returnDerived.R1_RETURN_ASSIGNED_206A - returnDerived.R1_RETURN_REM_206A)}건</span>
+              <span className="text-lg font-bold text-success">{returnDerived.DAY_206_ASSIGNED}건</span>
               <span className="text-xs text-muted-foreground block mt-1">
                 × {rate206A}원 = {returnDerived.RETURN_INCOME_206A.toLocaleString()}원
               </span>

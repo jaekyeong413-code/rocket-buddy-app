@@ -1,16 +1,18 @@
-import { Package } from 'lucide-react';
+import { Package, RotateCcw } from 'lucide-react';
 import { TodayWorkData, FreshBagData } from '@/types';
 
 interface StageCProps {
   workData: TodayWorkData;
   onFreshBagChange: (data: FreshBagData) => void;
   onRound1EndRemainingChange: (value: string) => void;
+  onStageC206AReturnRemainingChange?: (value: string) => void;
 }
 
 export function StageC({
   workData,
   onFreshBagChange,
   onRound1EndRemainingChange,
+  onStageC206AReturnRemainingChange,
 }: StageCProps) {
   const freshBag = workData.freshBag;
   
@@ -28,7 +30,7 @@ export function StageC({
       {/* 단계 설명 */}
       <div className="bg-primary/10 rounded-xl p-3 border border-primary/20">
         <p className="text-sm font-medium text-primary text-center">
-          1회전 종료 시점에 차량에 남아 있는 잔여 확인
+          1회전 종료 시점 (206A 포함) - 차량에 남아 있는 잔여 확인
         </p>
       </div>
 
@@ -52,6 +54,30 @@ export function StageC({
             <span className="text-lg font-bold text-success">{firstRoundDelivered}</span>
           </div>
         </div>
+      </div>
+
+      {/* Source Input: 206A 잔여(미방문) 반품 */}
+      <div className="bg-card rounded-2xl p-5 shadow-card border border-warning/30">
+        <div className="flex items-center gap-2 mb-4">
+          <RotateCcw className="w-5 h-5 text-warning" />
+          <h3 className="text-base font-semibold text-warning">206A 잔여 반품</h3>
+          <span className="text-xs bg-warning/10 px-2 py-0.5 rounded text-warning">Source</span>
+        </div>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={workData.stageC_206A_returnRemaining ?? ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            onStageC206AReturnRemainingChange?.(val);
+          }}
+          placeholder="0"
+          className="w-full h-14 px-4 text-xl font-bold text-center bg-warning/10 rounded-xl border-2 border-transparent focus:border-warning focus:outline-none transition-colors"
+        />
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          1회전 종료 (206A까지) 시점에 206A에 남아 있는 반품 수량
+        </p>
       </div>
 
       {/* 1회전 종료 시점 프레시백 잔여 */}

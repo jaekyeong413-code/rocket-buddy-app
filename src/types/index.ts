@@ -148,11 +148,17 @@ export interface TodayWorkData {
   // [Stage B] 203D 잔여 물량 (= F_r1_203D_remain)
   // → routes['203D'].firstRoundRemaining에 저장
   
-  // [Stage B] 203D 잔여 반품 - 반품 라우트 분리용
+  // [Stage B] 203D 잔여(미방문) 반품 (203D 1회전 종료 시점)
   stageB_returnRemaining_203D?: number;
   
-  // [Stage B] 206A 잔여 반품 - 반품 라우트 분리용
-  stageB_returnRemaining_206A?: number;
+  // [Stage B] 206A 1회전 반품 물량 (이 시점에 203D만 종료, 206A는 진행 전)
+  stageB_206A_R1_assigned?: number;
+  
+  // [Stage C] 206A 잔여(미방문) 반품 (1회전 종료 - 206A까지)
+  stageC_206A_returnRemaining?: number;
+  
+  // [Stage E] 이 시점 206A 잔여 반품 (203D 완전 종료 시점)
+  stageE_206A_returnRemaining?: number;
   
   // [Stage C] 1회전 종료 시점 잔여 물량 (= H_round1EndRemaining) - 있으면 입력
   round1EndRemaining?: number;
@@ -208,7 +214,10 @@ export interface TodayWorkData {
   stageC_giftRemain_203D?: number;     // 제거됨: 중복 입력 금지
   stageC_giftRemain_206A?: number;     // 제거됨: 중복 입력 금지
   stageD_giftRemain_206A?: number;     // 제거됨: Stage E에서 파생
-  stageC_returnRemaining_206A?: number; // 제거됨: stageB_returnRemaining_206A로 통합
+  
+  // 구버전 호환용 (제거 예정)
+  stageB_returnRemaining_206A?: number; // 제거됨: stageB_206A_R1_assigned로 대체
+  stageC_returnRemaining_206A?: number; // 제거됨: stageC_206A_returnRemaining으로 대체
 }
 
 export interface DailyStats {
