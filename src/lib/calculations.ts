@@ -1,6 +1,7 @@
 import { Settings, WorkRecord, PeriodSummary, WeeklyStats, FreshBagData, DeliveryData, ReturnsData, TodayWorkData } from '@/types';
 import { calculateGiftFromWorkData, GiftDerivedValues } from './giftCalculations';
 import { calculateReturnFromWorkData, ReturnDerivedValues } from './returnCalculations';
+import { extractUnifiedSourceInputs, calculateUnifiedDerived, UnifiedDerivedValues } from './unifiedCalculations';
 
 // ================================
 // 고정 단가 (참조용 - settings에서 가져옴)
