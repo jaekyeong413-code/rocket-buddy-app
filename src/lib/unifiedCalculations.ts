@@ -200,7 +200,7 @@ export function calculateUnifiedDerived(s: UnifiedSourceInputs): UnifiedDerivedV
   // ========================
   // 2-4) 2회전 신규 기프트
   // ========================
-  const GIFT_R2_NEW_TOTAL = Math.max(0, s.D_GIFT_TOTAL_NOW - GIFT_R1_REMAIN_TOTAL);
+  const GIFT_R2_NEW_TOTAL = Math.max(0, s.D_GIFT_TOTAL_NOW - s.C_GIFT_206A_REMAIN);
   const GIFT_R2_NEW_206A = Math.max(0, s.E_GIFT_REMAIN - s.C_GIFT_206A_REMAIN);
   const GIFT_R2_NEW_203D = Math.max(0, GIFT_R2_NEW_TOTAL - GIFT_R2_NEW_206A);
   
