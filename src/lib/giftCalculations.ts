@@ -26,8 +26,8 @@ export interface GiftSourceInputs {
   // Stage B: 전체 잔여 기프트
   B_GIFT_REM_TOT_R1: number;
   
-  // Stage C: 206A 잔여 기프트 (선택 - 없으면 B에서 자동 계산)
-  C_GIFT_REM_206A_R1: number | undefined;
+  // Stage C: 206A 잔여 기프트 (1회전 종료 시점 206A 잔여 - 필수!)
+  C_GIFT_REM_206A_R1: number;
   
   // Stage D: 2회전 시작 전 전체 기프트 (잔여 + 신규)
   D_GIFT_TOT_BEFORE_R2: number;
@@ -44,7 +44,7 @@ export interface GiftDerivedValues {
   A1: number;
   Btot: number;
   B203: number;
-  C206: number | undefined;
+  C206: number;
   D2tot: number;
   Erem: number;
   
@@ -85,10 +85,9 @@ export function extractGiftSourceInputs(workData: TodayWorkData): GiftSourceInpu
     // Stage B: 전체 잔여 기프트
     B_GIFT_REM_TOT_R1: NZ(workData.totalRemainingAfterFirstRound),
     
-    // Stage C: 206A 잔여 기프트 (선택)
-    // 현재 UI에서는 별도 필드가 없으므로 round1EndRemaining 값이 있으면 B값과 동일하게 취급
-    // 차후 Stage C에 206A 입력칸 추가 시 사용
-    C_GIFT_REM_206A_R1: undefined, // 현재는 undefined (B값에서 자동 계산)
+    // Stage C: 206A 잔여 기프트 (1회전 종료 시점 - 필수!)
+    // round1EndRemaining이 C_GIFT_206A_REMAIN으로 매핑됨
+    C_GIFT_REM_206A_R1: NZ(workData.round1EndRemaining),
     
     // Stage D: 2회전 시작 전 전체 기프트
     D_GIFT_TOT_BEFORE_R2: NZ(workData.round2TotalRemaining),
@@ -106,33 +105,33 @@ export function calculateGiftDerived(sources: GiftSourceInputs): GiftDerivedValu
   const A1 = NZ(sources.A_GIFT1_TOTAL);
   const Btot = NZ(sources.B_GIFT_REM_TOT_R1);
   const B203 = NZ(sources.B_GIFT_REM_203D_R1);
-  const C206 = sources.C_GIFT_REM_206A_R1; // undefined 가능
+  const C206 = NZ(sources.C_GIFT_REM_206A_R1); // Stage C 206A 잔여 (필수)
   const D2tot = NZ(sources.D_GIFT_TOT_BEFORE_R2);
   const Erem = NZ(sources.E_GIFT_REM_TOT_AFTER_203D_R2);
 
-  // (3-1) 1회전 종료 시점 잔여 분해 (206A 잔여)
+  // (3-1) 1회전 종료 시점 206A 잔여
+  // C206이 입력되지 않았으면 B에서 역산 (Btot - B203)
   const REM_206A_R1_FROM_B = Math.max(0, Btot - B203);
-  const REM_206A_R1 = C206 !== undefined ? NZ(C206) : REM_206A_R1_FROM_B;
+  const REM_206A_R1 = C206 > 0 ? C206 : REM_206A_R1_FROM_B;
 
   // (3-2) 1차(1회전) 기프트 — 라우트별 분해
   // GIFT1_203D = A1 - Btot + B203
   // 해석: 1차 전체(A1)에서 전체잔여(Btot)를 빼고, 203D잔여(B203)를 더함
-  // = 1차 전체 - 206A 완료 - 206A 잔여 + 203D 잔여 ... 간단히: 1차에서 배송 완료된 203D
   const GIFT1_203D = Math.max(0, A1 - Btot + B203);
   
   // GIFT1_206A = A1 - GIFT1_203D
   const GIFT1_206A = Math.max(0, A1 - GIFT1_203D);
 
   // (3-3) 2회전 "신규 할당 총합"
-  // 수정: D2tot에서 206A 잔여(REM_206A_R1)만 빼야 함 (203D 잔여는 이미 완료 처리됨)
-  // GIFT2_NEW_TOTAL = D2tot - REM_206A_R1
-  const GIFT2_NEW_TOTAL = Math.max(0, D2tot - REM_206A_R1);
+  // ★ 핵심 수정: D_GIFT_TOTAL_NOW - C_GIFT_206A_REMAIN (C206 사용!)
+  // D2tot에서 C206(1회전 종료 206A 잔여)만 빼야 신규 할당이 나옴
+  // (203D 잔여 B203은 이미 1회전에서 완료 처리됨)
+  const GIFT2_NEW_TOTAL = Math.max(0, D2tot - C206);
 
   // (3-4) 2회전 신규 할당(206A)
   // Stage E 정의: "203D 2회전 완전 종료 직후 전체 잔여 = 206A 잔여"
-  // GIFT2_NEW_206A = Erem - REM_206A_R1
-  // 해석: 최종 남은 것(Erem)에서 1회전 206A 잔여(REM_206A_R1)를 빼면 2회전에서 새로 추가된 206A
-  const GIFT2_NEW_206A = Math.max(0, Erem - REM_206A_R1);
+  // GIFT2_NEW_206A = Erem - C206
+  const GIFT2_NEW_206A = Math.max(0, Erem - C206);
 
   // (3-5) 2회전 신규 할당(203D)
   // GIFT2_NEW_203D = GIFT2_NEW_TOTAL - GIFT2_NEW_206A
