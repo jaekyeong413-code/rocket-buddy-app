@@ -17,8 +17,11 @@ const REASONS: { id: ReturnNotCollectedReason; label: string }[] = [
   { id: 'absent', label: '반품 부재' },
   { id: 'customerNotReceived', label: '고객 상품 미수령' },
   { id: 'alreadyCollected', label: '쿠팡 이미 회수' },
-  { id: 'cancelled', label: '반품 취소' },
+  { id: 'cancelled', label: '반품 철회' },
 ];
+
+// 회수율 차감 없는 사유들
+const NO_DEDUCTION_REASONS: ReturnNotCollectedReason[] = ['absent', 'cancelled'];
 
 export function ReturnNotCollectedSheet({ isOpen, onClose }: ReturnNotCollectedSheetProps) {
   const { getCurrentInputDate, getWorkData, updateWorkData } = useStore();
@@ -41,21 +44,22 @@ export function ReturnNotCollectedSheet({ isOpen, onClose }: ReturnNotCollectedS
     const existingEntries = workData.returnNotCollected || [];
     
     // Returns에도 반영
-    // 사유가 'absent' (반품 부재)인 경우에만 회수율 차감 없음
+    // '반품 부재', '반품 철회'는 회수율 차감 없음
     // 그 외 사유는 수량만큼 회수율 차감 (notCollected에 추가)
     const returns = { ...workData.returns };
-    if (selectedReason !== 'absent') {
+    const isNoDeduction = NO_DEDUCTION_REASONS.includes(selectedReason);
+    if (!isNoDeduction) {
       // 회수율 차감: notCollected에 추가
       returns.notCollected = (returns.notCollected || 0) + quantity;
     }
-    // 'absent'인 경우: 회수율에 영향 없음 (notCollected에 추가하지 않음)
+    // 차감 없는 사유: 회수율에 영향 없음 (notCollected에 추가하지 않음)
     
     updateWorkData(date, {
       returnNotCollected: [...existingEntries, newEntry],
       returns,
     });
     
-    const rateMessage = selectedReason === 'absent' 
+    const rateMessage = isNoDeduction 
       ? '(회수율 차감 없음)' 
       : '(회수율 차감)';
     toast({ title: `반품 미회수 ${quantity}건 저장 ${rateMessage}` });
@@ -128,8 +132,8 @@ export function ReturnNotCollectedSheet({ isOpen, onClose }: ReturnNotCollectedS
                 </button>
               ))}
             </div>
-            {selectedReason === 'absent' && (
-              <p className="text-xs text-success mt-1">✓ 반품 부재는 회수율 차감 없음</p>
+            {NO_DEDUCTION_REASONS.includes(selectedReason) && (
+              <p className="text-xs text-success mt-1">✓ 반품 부재, 반품 철회는 회수율 차감 없음</p>
             )}
           </div>
 
