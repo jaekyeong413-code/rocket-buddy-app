@@ -69,7 +69,7 @@ const Index = () => {
           )}
 
           {activeTab === 'records' && (
-            <RecordsList onEdit={handleRecordEdit} />
+            <RecordsList />
           )}
 
           {activeTab === 'settings' && <SettingsPage />}

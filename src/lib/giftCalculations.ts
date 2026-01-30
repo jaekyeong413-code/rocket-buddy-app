@@ -123,10 +123,8 @@ export function calculateGiftDerived(sources: GiftSourceInputs): GiftDerivedValu
   const GIFT1_206A = Math.max(0, A1 - GIFT1_203D);
 
   // (3-3) 2회전 "신규 할당 총합"
-  // ★ 핵심 수정: D_GIFT_TOTAL_NOW - C_GIFT_206A_REMAIN (C206 사용!)
-  // D2tot에서 C206(1회전 종료 206A 잔여)만 빼야 신규 할당이 나옴
-  // (203D 잔여 B203은 이미 1회전에서 완료 처리됨)
-  const GIFT2_NEW_TOTAL = Math.max(0, D2tot - C206);
+  // ★ 지시서 정식 수식: D_GIFT_TOTAL_NOW - (B_203D잔여 + C_206A잔여)
+  const GIFT2_NEW_TOTAL = Math.max(0, D2tot - (B203 + C206));
 
   // (3-4) 2회전 신규 할당(206A)
   // Stage E 정의: "203D 2회전 완전 종료 직후 전체 잔여 = 206A 잔여"
