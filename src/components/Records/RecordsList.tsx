@@ -1,283 +1,372 @@
-import { useState, useMemo } from 'react';
-import { Edit2, Trash2, Package, Truck, ArrowRightLeft, Plus, Download, Filter, Calendar } from 'lucide-react';
-import { useStore } from '@/store/useStore';
-import { WorkRecord, FilterType } from '@/types';
+/**
+ * 기록탭 메인 컴포넌트 (전면 개편)
+ * 
+ * 3개 뷰:
+ * 1. Records List (일자 목록)
+ * 2. Record Detail (일자 상세)
+ * 3. Stats (주/월 통계)
+ */
+
+import { useState, useMemo, useRef } from 'react';
 import { 
-  formatCurrency, 
-  calculateActualDeliveries, 
-  getCurrentPeriod,
-  calculateWeeklyStats,
-  getWeekNumber,
-} from '@/lib/calculations';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  Filter, 
+  Download, 
+  Upload, 
+  Calendar, 
+  BarChart3, 
+  List,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+  FileJson,
+  FileSpreadsheet,
+} from 'lucide-react';
+import { useStore } from '@/store/useStore';
+import { TodayWorkData } from '@/types';
+import { getAllDrafts, saveDraft, DraftData } from '@/lib/storage';
+import { exportAllDrafts, exportByPeriod, parseImportJSON, sourcesToWorkData } from '@/lib/recordExport';
+import { RecordCard } from './RecordCard';
+import { RecordDetail } from './RecordDetail';
+import { RecordsStats } from './RecordsStats';
 import { toast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
 
-interface RecordItemProps {
-  record: WorkRecord;
-  onEdit: (record: WorkRecord) => void;
-  onDelete: (id: string) => void;
-  routeRate: number;
-  fbRates: { regular: number; standalone: number };
-}
+type ViewMode = 'list' | 'detail' | 'stats';
+type FilterPeriod = 'week' | 'month' | 'all';
 
-function RecordItem({ record, onEdit, onDelete, routeRate, fbRates }: RecordItemProps) {
-  const [showDelete, setShowDelete] = useState(false);
+export function RecordsList() {
+  const { getWorkData } = useStore();
   
-  const actualDeliveries = calculateActualDeliveries(record);
+  // 뷰 상태
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>('week');
   
-  // FB 완료 수량 계산 (할당 - 미회수)
-  const regularCompleted = Math.max(0, (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0) - (record.freshBag.failedAbsent || 0) - (record.freshBag.failedNoProduct || 0));
-  const standaloneCompleted = Math.max(0, (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0));
-  
-  const income =
-    actualDeliveries * routeRate +
-    (record.returns.completed + record.returns.numbered) * routeRate +
-    regularCompleted * fbRates.regular +
-    standaloneCompleted * fbRates.standalone;
-
-  return (
-    <>
-      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30 animate-slide-up">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-primary">{record.route}</span>
-            <span className="text-xs bg-muted px-2 py-0.5 rounded-full font-medium">
-              {record.round}회차
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                toast({ title: '수정 기능은 곧 추가됩니다' });
-              }}
-              className="p-2 rounded-lg hover:bg-muted transition-colors"
-            >
-              <Edit2 className="w-4 h-4 text-muted-foreground" />
-            </button>
-            <button
-              onClick={() => setShowDelete(true)}
-              className="p-2 rounded-lg hover:bg-destructive/10 transition-colors"
-            >
-              <Trash2 className="w-4 h-4 text-destructive" />
-            </button>
-          </div>
-        </div>
-
-        {/* 배송 상세 */}
-        <div className="bg-accent/30 rounded-xl p-3 mb-3">
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span>할당 {record.delivery.allocated}</span>
-            {record.delivery.transferred > 0 && (
-              <span className="flex items-center gap-1 text-destructive">
-                <ArrowRightLeft className="w-3 h-3" />
-                이관 -{record.delivery.transferred}
-              </span>
-            )}
-            {record.delivery.added > 0 && (
-              <span className="flex items-center gap-1 text-success">
-                <Plus className="w-3 h-3" />
-                추가 +{record.delivery.added}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <Truck className="w-4 h-4 text-primary" />
-            <span className="text-2xl font-bold text-primary">{actualDeliveries}</span>
-            <span className="text-sm text-muted-foreground">건 완료</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-center mb-3">
-          <div className="bg-warning/10 rounded-xl p-2">
-            <div className="flex items-center justify-center gap-1 text-warning">
-              <Package className="w-3 h-3" />
-              <span className="text-xs">반품</span>
-            </div>
-            <div className="text-lg font-bold">{record.returns.completed}</div>
-          </div>
-          <div className="bg-success/10 rounded-xl p-2">
-            <div className="flex items-center justify-center gap-1 text-success">
-              <Package className="w-3 h-3" />
-              <span className="text-xs">FB</span>
-            </div>
-            <div className="text-lg font-bold">
-              {(record.freshBag.regularAllocated || 0) + (record.freshBag.standaloneAllocated || 0)}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between pt-3 border-t border-border/50">
-          <span className="text-xs text-muted-foreground">예상 수입</span>
-          <span className="text-sm font-bold text-primary">
-            {formatCurrency(income)}
-          </span>
-        </div>
-      </div>
-
-      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>기록 삭제</AlertDialogTitle>
-            <AlertDialogDescription>
-              이 작업 기록을 삭제하시겠습니까? 삭제된 기록은 복구할 수 없습니다.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">취소</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => onDelete(record.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
-            >
-              삭제
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
-}
-
-export function RecordsList({ onEdit }: { onEdit: (record: WorkRecord) => void }) {
-  const { records, settings, deleteRecord } = useStore();
-  const [filterType, setFilterType] = useState<FilterType>('daily');
+  // 월 선택 (월간 필터용)
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-
+  
+  // 파일 업로드 ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // 모든 Draft 가져오기
+  const allDrafts = useMemo(() => {
+    const drafts = getAllDrafts();
+    return Object.entries(drafts)
+      .filter(([_, draft]) => draft && draft.date)
+      .map(([date, draft]) => ({
+        date,
+        workData: draft as TodayWorkData,
+        updatedAt: (draft as DraftData).updatedAt,
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [viewMode]); // viewMode 변경 시 새로고침
+  
   // 필터링된 기록
   const filteredRecords = useMemo(() => {
     const now = new Date();
     
-    switch (filterType) {
-      case 'daily':
-        return records;
-      case 'weekly': {
-        const { week, year } = getWeekNumber(now);
-        return records.filter(r => {
-          const recordDate = new Date(r.date);
-          const recordWeek = getWeekNumber(recordDate);
-          return recordWeek.week === week && recordWeek.year === year;
-        });
+    switch (filterPeriod) {
+      case 'week': {
+        // 현재 주 (월~일)
+        const dayOfWeek = now.getDay();
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const monday = new Date(now);
+        monday.setDate(now.getDate() + mondayOffset);
+        monday.setHours(0, 0, 0, 0);
+        
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        
+        const startDate = monday.toISOString().split('T')[0];
+        const endDate = sunday.toISOString().split('T')[0];
+        
+        return allDrafts.filter(r => r.date >= startDate && r.date <= endDate);
       }
-      case 'monthly': {
+      case 'month': {
         const [year, month] = selectedMonth.split('-');
-        return records.filter(r => {
+        return allDrafts.filter(r => {
           const [recordYear, recordMonth] = r.date.split('-');
           return recordYear === year && recordMonth === month;
         });
       }
+      case 'all':
       default:
-        return records;
+        return allDrafts;
     }
-  }, [records, filterType, selectedMonth]);
-
-  // 날짜별 그룹화
-  const groupedRecords = filteredRecords.reduce((acc, record) => {
-    if (!acc[record.date]) {
-      acc[record.date] = [];
+  }, [allDrafts, filterPeriod, selectedMonth]);
+  
+  // 기간 라벨
+  const periodLabel = useMemo(() => {
+    const now = new Date();
+    
+    switch (filterPeriod) {
+      case 'week': {
+        const dayOfWeek = now.getDay();
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const monday = new Date(now);
+        monday.setDate(now.getDate() + mondayOffset);
+        
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        
+        return `${monday.getMonth() + 1}/${monday.getDate()} ~ ${sunday.getMonth() + 1}/${sunday.getDate()}`;
+      }
+      case 'month': {
+        const [year, month] = selectedMonth.split('-');
+        return `${year}년 ${parseInt(month)}월`;
+      }
+      case 'all':
+      default:
+        return '전체 기간';
     }
-    acc[record.date].push(record);
-    return acc;
-  }, {} as Record<string, WorkRecord[]>);
-
-  const sortedDates = Object.keys(groupedRecords).sort(
-    (a, b) => new Date(b).getTime() - new Date(a).getTime()
-  );
-
-  // 주간 통계
-  const weeklyStats = useMemo(() => 
-    calculateWeeklyStats(records, settings), 
-    [records, settings]
-  );
-
-  // 엑셀 내보내기
-  const exportToExcel = () => {
-    const data = filteredRecords.map(record => {
-      const actualDeliveries = calculateActualDeliveries(record);
-      const regularCompleted = Math.max(0, (record.freshBag.regularAllocated || 0) + (record.freshBag.regularAdjustment || 0) - (record.freshBag.failedAbsent || 0) - (record.freshBag.failedNoProduct || 0));
-      const standaloneCompleted = Math.max(0, (record.freshBag.standaloneAllocated || 0) - (record.freshBag.regularAdjustment || 0));
-      const income =
-        actualDeliveries * settings.routes[record.route] +
-        (record.returns.completed + record.returns.numbered) * settings.routes[record.route] +
-        regularCompleted * settings.freshBag.regular +
-        standaloneCompleted * settings.freshBag.standalone;
-
-      return {
-        '날짜': record.date,
-        '노선': record.route,
-        '회차': record.round,
-        '할당': record.delivery.allocated,
-        '취소': record.delivery.cancelled,
-        '미완료': record.delivery.incomplete,
-        '이관': record.delivery.transferred,
-        '추가': record.delivery.added,
-        '실제완료': actualDeliveries,
-        '반품완료': record.returns.completed,
-        '반품채번': record.returns.numbered,
-        'FB일반할당': record.freshBag.regularAllocated || 0,
-        'FB단독할당': record.freshBag.standaloneAllocated || 0,
-        'FB미회수_부재': record.freshBag.failedAbsent || 0,
-        'FB미회수_상품없음': record.freshBag.failedNoProduct || 0,
-        '예상수입': income,
-      };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '작업기록');
-    
-    const fileName = `퀵플렉스_기록_${filterType}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    
-    toast({ title: '엑셀 파일이 다운로드되었습니다' });
+  }, [filterPeriod, selectedMonth]);
+  
+  // 레코드 상세 보기
+  const handleRecordClick = (date: string) => {
+    setSelectedDate(date);
+    setViewMode('detail');
   };
-
-  return (
-    <div className="space-y-4">
-      {/* 필터 및 내보내기 */}
-      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">필터</span>
-          </div>
+  
+  // 상세에서 돌아오기
+  const handleBackToList = () => {
+    setViewMode('list');
+    setSelectedDate(null);
+  };
+  
+  // 내보내기 핸들러
+  const handleExport = (format: 'json' | 'csv') => {
+    if (filterPeriod === 'all') {
+      exportAllDrafts(format);
+    } else if (filterPeriod === 'week') {
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() + mondayOffset);
+      
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      
+      exportByPeriod(
+        monday.toISOString().split('T')[0],
+        sunday.toISOString().split('T')[0],
+        format
+      );
+    } else {
+      const [year, month] = selectedMonth.split('-');
+      const startDate = `${year}-${month}-01`;
+      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+      const endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+      
+      exportByPeriod(startDate, endDate, format);
+    }
+    
+    toast({ title: `${format.toUpperCase()} 파일이 다운로드되었습니다` });
+  };
+  
+  // 가져오기 핸들러
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+  
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      const content = await file.text();
+      const data = parseImportJSON(content);
+      
+      if (!data) {
+        toast({ 
+          title: '가져오기 실패', 
+          description: '유효하지 않은 JSON 파일입니다',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      let imported = 0;
+      let skipped = 0;
+      
+      const existingDrafts = getAllDrafts();
+      
+      for (const record of data.records) {
+        // 기존 레코드가 있고, 더 최신이면 스킵
+        const existing = existingDrafts[record.date];
+        if (existing && existing.updatedAt && record.updatedAt) {
+          if (new Date(existing.updatedAt) >= new Date(record.updatedAt)) {
+            skipped++;
+            continue;
+          }
+        }
+        
+        // Source → WorkData 변환 후 저장
+        const workData = sourcesToWorkData(record.date, record.sources);
+        saveDraft(record.date, workData);
+        imported++;
+      }
+      
+      toast({ 
+        title: '가져오기 완료', 
+        description: `${imported}건 가져옴, ${skipped}건 스킵 (더 최신 데이터 있음)`,
+      });
+      
+      // 목록 새로고침
+      setViewMode('list');
+    } catch (err) {
+      toast({ 
+        title: '가져오기 실패', 
+        description: '파일을 읽는 중 오류가 발생했습니다',
+        variant: 'destructive',
+      });
+    }
+    
+    // 파일 입력 초기화
+    e.target.value = '';
+  };
+  
+  // 상세 뷰
+  if (viewMode === 'detail' && selectedDate) {
+    const workData = getWorkData(selectedDate);
+    return (
+      <RecordDetail
+        date={selectedDate}
+        workData={workData}
+        onBack={handleBackToList}
+      />
+    );
+  }
+  
+  // 통계 뷰
+  if (viewMode === 'stats') {
+    return (
+      <div className="space-y-4">
+        {/* 뷰 전환 버튼 */}
+        <div className="flex items-center gap-2 mb-4">
           <button
-            onClick={exportToExcel}
-            className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+            onClick={() => setViewMode('list')}
+            className="p-2 rounded-xl bg-muted hover:bg-muted/80 transition-colors"
           >
-            <Download className="w-4 h-4" />
-            엑셀 내보내기
+            <List className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setViewMode('stats')}
+            className="p-2 rounded-xl bg-primary text-primary-foreground"
+          >
+            <BarChart3 className="w-5 h-5" />
           </button>
         </div>
         
-        <div className="flex gap-2 mb-3">
-          {(['daily', 'weekly', 'monthly'] as FilterType[]).map((type) => (
+        {/* 필터 */}
+        <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
+          <div className="flex gap-2 mb-3">
+            {(['week', 'month', 'all'] as FilterPeriod[]).map((period) => (
+              <button
+                key={period}
+                onClick={() => setFilterPeriod(period)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  filterPeriod === period
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {period === 'week' ? '주간' : period === 'month' ? '월간' : '전체'}
+              </button>
+            ))}
+          </div>
+          
+          {filterPeriod === 'month' && (
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="w-full px-3 py-2 bg-muted rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          )}
+        </div>
+        
+        <RecordsStats records={filteredRecords} periodLabel={periodLabel} />
+      </div>
+    );
+  }
+  
+  // 목록 뷰
+  return (
+    <div className="space-y-4">
+      {/* 숨겨진 파일 입력 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      
+      {/* 상단 툴바 */}
+      <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
+        {/* 뷰 전환 + 내보내기/가져오기 */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
             <button
-              key={type}
-              onClick={() => setFilterType(type)}
+              onClick={() => setViewMode('list')}
+              className="p-2 rounded-xl bg-primary text-primary-foreground"
+            >
+              <List className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setViewMode('stats')}
+              className="p-2 rounded-xl bg-muted hover:bg-muted/80 transition-colors"
+            >
+              <BarChart3 className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleExport('json')}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              title="JSON 내보내기"
+            >
+              <FileJson className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => handleExport('csv')}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              title="CSV 내보내기"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              onClick={handleImport}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              title="가져오기"
+            >
+              <Upload className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+        
+        {/* 필터 */}
+        <div className="flex gap-2 mb-3">
+          {(['week', 'month', 'all'] as FilterPeriod[]).map((period) => (
+            <button
+              key={period}
+              onClick={() => setFilterPeriod(period)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterType === type
+                filterPeriod === period
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
-              {type === 'daily' ? '일간' : type === 'weekly' ? '주간' : '월간'}
+              {period === 'week' ? '주간' : period === 'month' ? '월간' : '전체'}
             </button>
           ))}
         </div>
-
-        {filterType === 'monthly' && (
+        
+        {filterPeriod === 'month' && (
           <input
             type="month"
             value={selectedMonth}
@@ -285,73 +374,30 @@ export function RecordsList({ onEdit }: { onEdit: (record: WorkRecord) => void }
             className="w-full px-3 py-2 bg-muted rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         )}
-      </div>
-
-      {/* 주간 통계 (주간 필터 선택 시) */}
-      {filterType === 'weekly' && weeklyStats.length > 0 && (
-        <div className="bg-card rounded-2xl p-4 shadow-card border border-border/30">
-          <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            주간 FB 회수율 통계
-          </h3>
-          <div className="space-y-2">
-            {weeklyStats.slice(0, 5).map((week) => (
-              <div key={`${week.year}-${week.weekNumber}`} className="flex items-center justify-between p-3 bg-muted rounded-xl">
-                <div>
-                  <span className="text-sm font-medium">{week.year}년 {week.weekNumber}주차</span>
-                  <p className="text-xs text-muted-foreground">
-                    {week.startDate.slice(5)} ~ {week.endDate.slice(5)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm">
-                    일반 <span className={week.regularFBRate >= 90 ? 'text-success font-bold' : ''}>{week.regularFBRate.toFixed(1)}%</span>
-                  </div>
-                  <div className="text-sm">
-                    단독 <span className={week.standaloneFBRate >= 70 ? 'text-success font-bold' : ''}>{week.standaloneFBRate.toFixed(1)}%</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        
+        {/* 기간 표시 */}
+        <div className="text-center text-sm text-muted-foreground">
+          {periodLabel} ({filteredRecords.length}건)
         </div>
-      )}
-
-      {/* 기록 리스트 */}
-      {sortedDates.length === 0 ? (
+      </div>
+      
+      {/* 기록 목록 */}
+      {filteredRecords.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground animate-slide-up">
           <Package className="w-12 h-12 mb-4 opacity-50" />
           <p className="text-sm">선택한 기간에 기록이 없습니다</p>
-          <p className="text-xs mt-1">작업 입력 탭에서 기록을 추가하세요</p>
+          <p className="text-xs mt-1">입력 탭에서 작업 기록을 추가하세요</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {sortedDates.map((date) => {
-            const dateRecords = groupedRecords[date];
-            const displayDate = new Date(date).toLocaleDateString('ko-KR', {
-              month: 'long',
-              day: 'numeric',
-              weekday: 'short',
-            });
-
-            return (
-              <div key={date} className="space-y-3">
-                <h3 className="text-sm font-semibold text-muted-foreground px-1">
-                  {displayDate}
-                </h3>
-                {dateRecords.map((record) => (
-                  <RecordItem
-                    key={record.id}
-                    record={record}
-                    onEdit={onEdit}
-                    onDelete={deleteRecord}
-                    routeRate={settings.routes[record.route]}
-                    fbRates={settings.freshBag}
-                  />
-                ))}
-              </div>
-            );
-          })}
+        <div className="space-y-3">
+          {filteredRecords.map(({ date, workData }) => (
+            <RecordCard
+              key={date}
+              date={date}
+              workData={workData}
+              onClick={() => handleRecordClick(date)}
+            />
+          ))}
         </div>
       )}
     </div>
