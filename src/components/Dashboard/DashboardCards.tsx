@@ -33,7 +33,7 @@ export function IncomeCard() {
           {formatCurrency(summary.netIncome)}
         </div>
         <p className="text-primary-foreground/70 text-sm mb-3">
-          {summary.startDate.slice(5)} ~ {summary.endDate.slice(5)} 기준
+          {summary.startDate.slice(5).replace('-', '/')} ~ {summary.endDate.slice(5).replace('-', '/')} 기준
         </p>
 
         {(hasRegularIncentive || hasStandaloneIncentive) && (
@@ -164,11 +164,19 @@ export function TodayIncomeCard() {
                 const rate203D = 850;
                 const rate206A = 750;
                 
-                // 금액 계산: 할당 = 수입 (잔여 차감 없음, 미회수만 별도 차감)
-                const income203D = assigned203D * rate203D;
-                const income206A = assigned206A * rate206A;
+                // 미회수 수량 (플로팅 입력)
+                const notCollected203D = incomeBreakdown.returnLoss203D;
+                const notCollected206A = incomeBreakdown.returnLoss206A;
+                const totalNotCollected = notCollected203D + notCollected206A;
+                
+                // 금액 계산: 할당 - 미회수
+                const net203D = Math.max(0, assigned203D - notCollected203D);
+                const net206A = Math.max(0, assigned206A - notCollected206A);
+                const income203D = net203D * rate203D;
+                const income206A = net206A * rate206A;
                 
                 const totalAssigned = assigned203D + assigned206A;
+                const totalNet = net203D + net206A;
                 const totalIncome = income203D + income206A;
                 
                 return (
@@ -179,7 +187,10 @@ export function TodayIncomeCard() {
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-warning">203D</span>
                           <span className="text-xs text-muted-foreground">
-                            {assigned203D}건
+                            {net203D}건
+                            {notCollected203D > 0 && (
+                              <span className="text-destructive ml-1">(-{notCollected203D})</span>
+                            )}
                           </span>
                         </div>
                         <span className="font-medium">
@@ -193,7 +204,10 @@ export function TodayIncomeCard() {
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-warning">206A</span>
                           <span className="text-xs text-muted-foreground">
-                            {assigned206A}건
+                            {net206A}건
+                            {notCollected206A > 0 && (
+                              <span className="text-destructive ml-1">(-{notCollected206A})</span>
+                            )}
                           </span>
                         </div>
                         <span className="font-medium">
@@ -206,7 +220,10 @@ export function TodayIncomeCard() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-warning">반품 합계</span>
                         <span className="text-xs text-muted-foreground">
-                          {totalAssigned}건
+                          {totalNet}건
+                          {totalNotCollected > 0 && (
+                            <span className="text-destructive ml-1">(-{totalNotCollected})</span>
+                          )}
                         </span>
                       </div>
                       <span className="font-semibold text-warning">{formatCurrency(totalIncome)}</span>

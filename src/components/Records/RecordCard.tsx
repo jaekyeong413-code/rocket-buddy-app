@@ -3,7 +3,7 @@
  * 날짜별 요약 정보를 표시
  */
 
-import { ChevronRight, TrendingUp, Package, Leaf, AlertCircle } from 'lucide-react';
+import { ChevronRight, TrendingUp, Package, Leaf, AlertCircle, RotateCcw } from 'lucide-react';
 import { TodayWorkData } from '@/types';
 import { calculateFromWorkData, formatRate, formatCurrency } from '@/lib/recordDerived';
 
@@ -30,6 +30,10 @@ export function RecordCard({ date, workData, onClick }: RecordCardProps) {
   const fbGenWarning = derived.FB_GEN_ASSIGNED > 0 && derived.FB_GEN_RATE < 0.9;
   const fbSoloWarning = derived.FB_SOLO_ASSIGNED > 0 && derived.FB_SOLO_RATE < 0.7;
   
+  // 반품 미회수 수량 계산
+  const returnNotCollectedEntries = workData.returnNotCollected || [];
+  const totalReturnNotCollected = returnNotCollectedEntries.reduce((sum, e) => sum + e.quantity, 0);
+  
   return (
     <button
       onClick={onClick}
@@ -48,6 +52,12 @@ export function RecordCard({ date, workData, onClick }: RecordCardProps) {
             <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5 rounded-full flex items-center gap-1">
               <AlertCircle className="w-3 h-3" />
               FB 주의
+            </span>
+          )}
+          {totalReturnNotCollected > 0 && (
+            <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5 rounded-full flex items-center gap-1">
+              <RotateCcw className="w-3 h-3" />
+              반품 -{totalReturnNotCollected}
             </span>
           )}
         </div>

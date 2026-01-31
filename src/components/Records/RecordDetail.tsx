@@ -88,6 +88,16 @@ export function RecordDetail({ date, workData, onBack }: RecordDetailProps) {
     weekday: 'long',
   });
   
+  // 반품 미회수 계산
+  const returnNotCollectedEntries = workData.returnNotCollected || [];
+  const returnNotCollected203D = returnNotCollectedEntries
+    .filter(e => e.route === '203D')
+    .reduce((sum, e) => sum + e.quantity, 0);
+  const returnNotCollected206A = returnNotCollectedEntries
+    .filter(e => e.route === '206A')
+    .reduce((sum, e) => sum + e.quantity, 0);
+  const totalReturnNotCollected = returnNotCollected203D + returnNotCollected206A;
+  
   // 내보내기 핸들러
   const handleExportJSON = () => {
     const record = toExportRecord(workData);
@@ -218,6 +228,11 @@ export function RecordDetail({ date, workData, onBack }: RecordDetailProps) {
         <DataRow label="203D 반품 비중" value={formatRate(derived.RET_RATE_203D)} unit="%" highlight />
         <DataRow label="206A 반품 비중" value={formatRate(derived.RET_RATE_206A)} unit="%" highlight />
         
+        <SectionDivider label="반품 미회수 (차감)" />
+        <DataRow label="203D 미회수" value={returnNotCollected203D > 0 ? `-${returnNotCollected203D}` : '0'} unit="건" highlight={returnNotCollected203D > 0} />
+        <DataRow label="206A 미회수" value={returnNotCollected206A > 0 ? `-${returnNotCollected206A}` : '0'} unit="건" highlight={returnNotCollected206A > 0} />
+        <DataRow label="미회수 합계" value={totalReturnNotCollected > 0 ? `-${totalReturnNotCollected}` : '0'} unit="건" highlight={totalReturnNotCollected > 0} />
+        
         <SectionDivider label="프레시백 회수율" />
         <DataRow label="203D FB 회수" value={derived.FB_203D_COLLECTED} unit="건" />
         <DataRow label="203D FB 미회수" value={derived.FB_203D_UNCOLLECTED} unit="건" />
@@ -250,9 +265,25 @@ export function RecordDetail({ date, workData, onBack }: RecordDetailProps) {
         <DataRow label="기프트 소계" value={formatCurrency(derived.INCOME_GIFT)} highlight />
         
         <SectionDivider label="반품 수입" />
+        <DataRow label="203D 반품 할당" value={`${derived.RET_DAY_203D}건 × ${RATE_203D}원`} />
         <DataRow label="203D 반품" value={formatCurrency(derived.INCOME_RET_203D)} />
+        {returnNotCollected203D > 0 && (
+          <DataRow label="203D 미회수 차감" value={`-${formatCurrency(returnNotCollected203D * RATE_203D)}`} />
+        )}
+        <DataRow label="206A 반품 할당" value={`${derived.RET_DAY_206A}건 × ${RATE_206A}원`} />
         <DataRow label="206A 반품" value={formatCurrency(derived.INCOME_RET_206A)} />
-        <DataRow label="반품 소계" value={formatCurrency(derived.INCOME_RET)} highlight />
+        {returnNotCollected206A > 0 && (
+          <DataRow label="206A 미회수 차감" value={`-${formatCurrency(returnNotCollected206A * RATE_206A)}`} />
+        )}
+        <DataRow 
+          label="반품 소계" 
+          value={formatCurrency(
+            derived.INCOME_RET - 
+            (returnNotCollected203D * RATE_203D) - 
+            (returnNotCollected206A * RATE_206A)
+          )} 
+          highlight 
+        />
         
         <SectionDivider label="프레시백 수입" />
         <DataRow label="일반 FB" value={formatCurrency(derived.INCOME_FB_GEN)} />
