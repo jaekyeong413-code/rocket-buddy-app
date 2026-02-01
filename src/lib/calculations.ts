@@ -38,7 +38,11 @@ export function getCurrentPeriod(): { startDate: string; endDate: string } {
 }
 
 export function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  // UTC 변환 없이 로컬 날짜 그대로 YYYY-MM-DD 형식으로 반환
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function parseDate(dateString: string): Date {
