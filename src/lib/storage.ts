@@ -2,8 +2,14 @@
  * 로컬 저장소 관리 모듈
  * Draft(임시 데이터)와 Records(확정 데이터)를 분리하여 관리
  */
-import { WorkRecord, TodayWorkData } from '@/types';
+import { WorkRecord, TodayWorkData, RecordWithMeta } from '@/types';
 import { formatDate, createDefaultDeliveryData, createDefaultReturnsData, createDefaultFreshBagData } from './calculations';
+import {
+  deleteRecordRemote,
+  fetchAllRecordsRemote,
+  fetchRecordsByPeriodRemote,
+  upsertRecordRemote,
+} from './recordsApi';
 
 // ===============================
 // 상수 정의
@@ -23,12 +29,6 @@ const CURRENT_SCHEMA_VERSION = 1;
 // ===============================
 export interface DraftData extends TodayWorkData {
   updatedAt: string;
-  schemaVersion: number;
-}
-
-export interface RecordWithMeta extends WorkRecord {
-  updatedAt: string;
-  syncedAt: string | null;
   schemaVersion: number;
 }
 
@@ -207,6 +207,46 @@ export function getAllRecords(): RecordWithMeta[] {
   }
 }
 
+function mergeRecordsByIdentity(
+  existing: RecordWithMeta[],
+  incoming: RecordWithMeta[]
+): RecordWithMeta[] {
+  const map = new Map<string, RecordWithMeta>();
+  for (const record of existing) {
+    map.set(`${record.date}-${record.route}-${record.round}`, record);
+  }
+  for (const record of incoming) {
+    map.set(`${record.date}-${record.route}-${record.round}`, record);
+  }
+  return Array.from(map.values());
+}
+
+export async function getAllRecordsRemoteFirst(): Promise<RecordWithMeta[]> {
+  try {
+    const remote = await fetchAllRecordsRemote();
+    saveRecords(remote);
+    return remote;
+  } catch (e) {
+    console.warn('Failed to fetch records from remote, using local fallback:', e);
+    return getAllRecords();
+  }
+}
+
+export async function getRecordsByPeriodRemoteFirst(
+  startDate: string,
+  endDate: string
+): Promise<RecordWithMeta[]> {
+  try {
+    const remote = await fetchRecordsByPeriodRemote(startDate, endDate);
+    const merged = mergeRecordsByIdentity(getAllRecords(), remote);
+    saveRecords(merged);
+    return remote;
+  } catch (e) {
+    console.warn('Failed to fetch records by period from remote, using local fallback:', e);
+    return getRecordsByPeriod(startDate, endDate);
+  }
+}
+
 /**
  * 기존 zustand persist 데이터에서 마이그레이션
  */
@@ -254,6 +294,17 @@ function saveRecords(records: RecordWithMeta[]): void {
   }
 }
 
+function markRecordSynced(id: string, syncedAt: string): void {
+  const records = getAllRecords();
+  const index = records.findIndex(r => r.id === id);
+  if (index < 0) return;
+  records[index] = {
+    ...records[index],
+    syncedAt,
+  };
+  saveRecords(records);
+}
+
 /**
  * Record 추가/업데이트 (같은 날짜+라우트+회차면 덮어쓰기)
  */
@@ -280,6 +331,17 @@ export function upsertRecord(record: WorkRecord): RecordWithMeta {
   }
   
   saveRecords(records);
+
+  void upsertRecordRemote(newRecord)
+    .then((synced) => {
+      if (synced?.syncedAt) {
+        markRecordSynced(newRecord.id, synced.syncedAt);
+      }
+    })
+    .catch((e) => {
+      console.warn('Failed to upsert record to remote:', e);
+    });
+
   return newRecord;
 }
 
@@ -290,6 +352,10 @@ export function deleteRecord(id: string): void {
   const records = getAllRecords();
   const filtered = records.filter(r => r.id !== id);
   saveRecords(filtered);
+
+  void deleteRecordRemote(id).catch((e) => {
+    console.warn('Failed to delete record from remote:', e);
+  });
 }
 
 /**
@@ -310,6 +376,16 @@ export function updateRecord(id: string, updates: Partial<WorkRecord>): RecordWi
   
   records[index] = updated;
   saveRecords(records);
+
+  void upsertRecordRemote(updated)
+    .then((synced) => {
+      if (synced?.syncedAt) {
+        markRecordSynced(updated.id, synced.syncedAt);
+      }
+    })
+    .catch((e) => {
+      console.warn('Failed to update record on remote:', e);
+    });
   
   return updated;
 }
@@ -350,9 +426,9 @@ export function setCurrentInputDate(date: string): void {
 /**
  * 앱 시작 시 호출하여 기존 데이터 마이그레이션
  */
-export function initializeStorage(): { records: RecordWithMeta[]; drafts: DraftsStore } {
-  // Records 마이그레이션 및 로드
-  const records = getAllRecords();
+export async function initializeStorage(): Promise<{ records: RecordWithMeta[]; drafts: DraftsStore }> {
+  // Records 마이그레이션 및 로드 (원격 우선)
+  const records = await getAllRecordsRemoteFirst();
   
   // 기존 workDataByDate를 Drafts로 마이그레이션
   let drafts: DraftsStore = {};

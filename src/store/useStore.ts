@@ -1,18 +1,17 @@
 import { create } from 'zustand';
-import { Settings, WorkRecord, RouteAllocationHistory, TodayWorkData, DeliveryData, ReturnsData, FreshBagData } from '@/types';
+import { Settings, WorkRecord, RouteAllocationHistory, TodayWorkData, DeliveryData, ReturnsData, FreshBagData, RecordWithMeta } from '@/types';
 import { formatDate, createDefaultDeliveryData, createDefaultReturnsData, createDefaultFreshBagData } from '@/lib/calculations';
 import {
-  getAllRecords,
+  getAllRecordsRemoteFirst,
   upsertRecord,
   deleteRecord as deleteRecordFromStorage,
   updateRecord as updateRecordInStorage,
-  getRecordsByPeriod as getRecordsByPeriodFromStorage,
+  getRecordsByPeriodRemoteFirst,
   getDraft,
   saveDraft,
   getCurrentInputDate as getStoredInputDate,
   setCurrentInputDate as setStoredInputDate,
   initializeStorage,
-  RecordWithMeta,
 } from '@/lib/storage';
 
 interface AppState {
@@ -27,13 +26,13 @@ interface AppState {
   initialized: boolean;
   
   // 초기화
-  initialize: () => void;
+  initialize: () => Promise<void>;
   
   updateSettings: (settings: Partial<Settings>) => void;
   addRecord: (record: WorkRecord) => void;
   updateRecord: (id: string, record: Partial<WorkRecord>) => void;
   deleteRecord: (id: string) => void;
-  getRecordsByPeriod: (startDate: string, endDate: string) => WorkRecord[];
+  getRecordsByPeriod: (startDate: string, endDate: string) => Promise<WorkRecord[]>;
   addAllocationHistory: (history: RouteAllocationHistory) => void;
   getRouteRatio: () => { '203D': number; '206A': number };
   // 작업 데이터 관리 (Draft - 날짜별)
@@ -46,7 +45,7 @@ interface AppState {
   // 오늘 입력 데이터 (대시보드용)
   getTodayWorkData: () => TodayWorkData;
   // Records 새로고침
-  refreshRecords: () => void;
+  refreshRecords: () => Promise<void>;
 }
 
 const defaultSettings: Settings = {
@@ -133,8 +132,8 @@ export const useStore = create<AppState>()((set, get) => ({
   initialized: false,
   
   // 앱 시작 시 호출 - 로컬 스토리지에서 데이터 로드 및 마이그레이션
-  initialize: () => {
-    const { records, drafts } = initializeStorage();
+  initialize: async () => {
+    const { records, drafts } = await initializeStorage();
     set({
       records,
       workDataByDate: drafts,
@@ -181,8 +180,8 @@ export const useStore = create<AppState>()((set, get) => ({
     });
   },
   
-  getRecordsByPeriod: (startDate, endDate) => {
-    return getRecordsByPeriodFromStorage(startDate, endDate);
+  getRecordsByPeriod: async (startDate, endDate) => {
+    return getRecordsByPeriodRemoteFirst(startDate, endDate);
   },
 
   addAllocationHistory: (history) => {
@@ -313,8 +312,8 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   
   // Records 새로고침 (외부 변경 시)
-  refreshRecords: () => {
-    const records = getAllRecords();
+  refreshRecords: async () => {
+    const records = await getAllRecordsRemoteFirst();
     set({ records });
   },
 }));

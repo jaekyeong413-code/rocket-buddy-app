@@ -25,7 +25,7 @@ const Index = () => {
   // 앱 시작 시 로컬 스토리지에서 데이터 로드 및 마이그레이션
   useEffect(() => {
     if (!initialized) {
-      initialize();
+      void initialize();
     }
   }, [initialize, initialized]);
 

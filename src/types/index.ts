@@ -82,6 +82,12 @@ export interface WorkRecord {
   freshBag: FreshBagData;
 }
 
+export interface RecordWithMeta extends WorkRecord {
+  updatedAt: string;
+  syncedAt: string | null;
+  schemaVersion: number;
+}
+
 // 프백 미회수 사유
 export type FreshBagNotCollectedReason = 'absent' | 'hasProducts';
 
