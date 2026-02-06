@@ -21,4 +21,4 @@ const App = () => (
 );
 
 export default App;
-
+console.info("BUILD_MARKER_20260206_A");
